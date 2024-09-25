@@ -25,11 +25,7 @@ import "./DLCBTC.sol";
  * @custom:contact eng@dlc.link
  * @custom:website https://www.dlc.link
  */
-contract DLCManager is
-    Initializable,
-    AccessControlDefaultAdminRulesUpgradeable,
-    PausableUpgradeable
-{
+contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable, PausableUpgradeable {
     using DLCLink for DLCLink.DLC;
     using DLCLink for DLCLink.DLCStatus;
     using SafeERC20 for DLCBTC;
@@ -38,12 +34,9 @@ contract DLCManager is
     //                      STATE VARIABLES                       //
     ////////////////////////////////////////////////////////////////
 
-    bytes32 public constant DLC_ADMIN_ROLE =
-        0x2bf88000669ee6f7a648a231f4adbc117f5a8e34f980c08420b9b9a9f2640aa1; // keccak256("DLC_ADMIN_ROLE")
-    bytes32 public constant WHITELISTED_CONTRACT =
-        0xec26500344858148ae6c4dd068dc3bae426095ee44cdb32b94288d883648f619; // keccak256("WHITELISTED_CONTRACT")
-    bytes32 public constant APPROVED_SIGNER =
-        0xc726b34d4e524d7255dc7e36b5dfca6bd2dcd2891ae8c75d511a7e82da8696e5; // keccak256("APPROVED_SIGNER")
+    bytes32 public constant DLC_ADMIN_ROLE = 0x2bf88000669ee6f7a648a231f4adbc117f5a8e34f980c08420b9b9a9f2640aa1; // keccak256("DLC_ADMIN_ROLE")
+    bytes32 public constant WHITELISTED_CONTRACT = 0xec26500344858148ae6c4dd068dc3bae426095ee44cdb32b94288d883648f619; // keccak256("WHITELISTED_CONTRACT")
+    bytes32 public constant APPROVED_SIGNER = 0xc726b34d4e524d7255dc7e36b5dfca6bd2dcd2891ae8c75d511a7e82da8696e5; // keccak256("APPROVED_SIGNER")
 
     uint256 private _index;
     mapping(uint256 => DLCLink.DLC) public dlcs;
@@ -114,8 +107,9 @@ contract DLCManager is
     }
 
     modifier onlyWhitelisted() {
-        if (whitelistingEnabled && !_whitelistedAddresses[msg.sender])
+        if (whitelistingEnabled && !_whitelistedAddresses[msg.sender]) {
             revert NotWhitelisted();
+        }
         _;
     }
 
@@ -134,8 +128,9 @@ contract DLCManager is
         __AccessControlDefaultAdminRules_init(2 days, defaultAdmin);
         _grantRole(DLC_ADMIN_ROLE, dlcAdminRole);
         _minimumThreshold = 2;
-        if (threshold < _minimumThreshold)
+        if (threshold < _minimumThreshold) {
             revert ThresholdTooLow(_minimumThreshold);
+        }
         _threshold = threshold;
         _index = 0;
         tssCommitment = 0x0;
@@ -159,20 +154,8 @@ contract DLCManager is
 
     event CreateDLC(bytes32 uuid, address creator, uint256 timestamp);
 
-    event SetStatusFunded(
-        bytes32 uuid,
-        string btcTxId,
-        address creator,
-        uint256 newValueLocked,
-        uint256 amountToMint
-    );
-    event SetStatusPending(
-        bytes32 uuid,
-        string btcTxId,
-        address creator,
-        string taprootPubKey,
-        uint256 newValueLocked
-    );
+    event SetStatusFunded(bytes32 uuid, string btcTxId, address creator, uint256 newValueLocked, uint256 amountToMint);
+    event SetStatusPending(bytes32 uuid, string btcTxId, address creator, string taprootPubKey, uint256 newValueLocked);
     event Withdraw(bytes32 uuid, uint256 amount, address sender);
 
     event SetThreshold(uint16 newThreshold);
@@ -195,19 +178,8 @@ contract DLCManager is
     //                    INTERNAL FUNCTIONS                      //
     ////////////////////////////////////////////////////////////////
 
-    function _generateUUID(
-        address sender,
-        uint256 nonce
-    ) private view returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    sender,
-                    nonce,
-                    blockhash(block.number - 1),
-                    block.chainid
-                )
-            );
+    function _generateUUID(address sender, uint256 nonce) private view returns (bytes32) {
+        return keccak256(abi.encodePacked(sender, nonce, blockhash(block.number - 1), block.chainid));
     }
 
     /**
@@ -218,25 +190,18 @@ contract DLCManager is
      * @param   message  Original message that was signed.
      * @param   signatures  Byte array of at least 'threshold' number of signatures.
      */
-    function _attestorMultisigIsValid(
-        bytes memory message,
-        bytes[] memory signatures
-    ) internal view {
+    function _attestorMultisigIsValid(bytes memory message, bytes[] memory signatures) internal view {
         if (signatures.length < _threshold) revert NotEnoughSignatures();
 
-        bytes32 prefixedMessageHash = MessageHashUtils.toEthSignedMessageHash(
-            keccak256(message)
-        );
+        bytes32 prefixedMessageHash = MessageHashUtils.toEthSignedMessageHash(keccak256(message));
 
         if (_hasDuplicates(signatures)) revert DuplicateSignature();
 
         for (uint256 i = 0; i < signatures.length; i++) {
-            address attestorPubKey = ECDSA.recover(
-                prefixedMessageHash,
-                signatures[i]
-            );
-            if (!hasRole(APPROVED_SIGNER, attestorPubKey))
+            address attestorPubKey = ECDSA.recover(prefixedMessageHash, signatures[i]);
+            if (!hasRole(APPROVED_SIGNER, attestorPubKey)) {
                 revert InvalidSigner();
+            }
         }
     }
 
@@ -246,11 +211,9 @@ contract DLCManager is
      * @param   signatures  Array of signatures.
      * @return  bool  True if there are duplicates, false otherwise.
      */
-    function _hasDuplicates(
-        bytes[] memory signatures
-    ) internal pure returns (bool) {
-        for (uint i = 0; i < signatures.length - 1; i++) {
-            for (uint j = i + 1; j < signatures.length; j++) {
+    function _hasDuplicates(bytes[] memory signatures) internal pure returns (bool) {
+        for (uint256 i = 0; i < signatures.length - 1; i++) {
+            for (uint256 j = i + 1; j < signatures.length; j++) {
                 if (keccak256(signatures[i]) == keccak256(signatures[j])) {
                     return true;
                 }
@@ -277,12 +240,7 @@ contract DLCManager is
      * @notice  Creates a new vault for the user
      * @return  bytes32  uuid of the new vault/DLC
      */
-    function setupVault()
-        external
-        whenNotPaused
-        onlyWhitelisted
-        returns (bytes32)
-    {
+    function setupVault() external whenNotPaused onlyWhitelisted returns (bytes32) {
         bytes32 _uuid = _generateUUID(tx.origin, _index);
 
         dlcs[_index] = DLCLink.DLC({
@@ -319,16 +277,12 @@ contract DLCManager is
      * @param   signatures  Signatures of the Attestors.
      * @param   newValueLocked  New value locked in the DLC.
      */
-    function setStatusFunded(
-        bytes32 uuid,
-        string calldata btcTxId,
-        bytes[] calldata signatures,
-        uint256 newValueLocked
-    ) external whenNotPaused onlyApprovedSigners {
-        _attestorMultisigIsValid(
-            abi.encode(uuid, btcTxId, "set-status-funded", newValueLocked),
-            signatures
-        );
+    function setStatusFunded(bytes32 uuid, string calldata btcTxId, bytes[] calldata signatures, uint256 newValueLocked)
+        external
+        whenNotPaused
+        onlyApprovedSigners
+    {
+        _attestorMultisigIsValid(abi.encode(uuid, btcTxId, "set-status-funded", newValueLocked), signatures);
         DLCLink.DLC storage dlc = dlcs[dlcIDsByUUID[uuid]];
 
         if (dlc.uuid == bytes32(0)) revert DLCNotFound();
@@ -362,13 +316,7 @@ contract DLCManager is
 
         _mintTokens(dlc.creator, amountToMint);
 
-        emit SetStatusFunded(
-            uuid,
-            btcTxId,
-            dlc.creator,
-            newValueLocked,
-            amountToMint
-        );
+        emit SetStatusFunded(uuid, btcTxId, dlc.creator, newValueLocked, amountToMint);
     }
 
     /**
@@ -387,29 +335,19 @@ contract DLCManager is
         string calldata taprootPubKey,
         uint256 newValueLocked
     ) external whenNotPaused onlyApprovedSigners {
-        _attestorMultisigIsValid(
-            abi.encode(uuid, wdTxId, "set-status-pending", newValueLocked),
-            signatures
-        );
+        _attestorMultisigIsValid(abi.encode(uuid, wdTxId, "set-status-pending", newValueLocked), signatures);
         DLCLink.DLC storage dlc = dlcs[dlcIDsByUUID[uuid]];
 
         if (dlc.uuid == bytes32(0)) revert DLCNotFound();
-        if (
-            dlc.status != DLCLink.DLCStatus.READY &&
-            dlc.status != DLCLink.DLCStatus.FUNDED
-        ) revert DLCNotReadyOrFunded();
+        if (dlc.status != DLCLink.DLCStatus.READY && dlc.status != DLCLink.DLCStatus.FUNDED) {
+            revert DLCNotReadyOrFunded();
+        }
 
         dlc.status = DLCLink.DLCStatus.AUX_STATE_1;
         dlc.wdTxId = wdTxId;
         dlc.taprootPubKey = taprootPubKey;
 
-        emit SetStatusPending(
-            uuid,
-            wdTxId,
-            dlc.creator,
-            taprootPubKey,
-            newValueLocked
-        );
+        emit SetStatusPending(uuid, wdTxId, dlc.creator, taprootPubKey, newValueLocked);
     }
 
     /**
@@ -418,20 +356,15 @@ contract DLCManager is
      * @param   uuid  uuid of the vault/DLC
      * @param   amount  amount of tokens to burn
      */
-    function withdraw(
-        bytes32 uuid,
-        uint256 amount
-    ) external onlyVaultCreator(uuid) whenNotPaused {
+    function withdraw(bytes32 uuid, uint256 amount) external onlyVaultCreator(uuid) whenNotPaused {
         DLCLink.DLC storage dlc = dlcs[dlcIDsByUUID[uuid]];
 
         // Validation checks
         if (dlc.uuid == bytes32(0)) revert DLCNotFound();
         if (dlc.status != DLCLink.DLCStatus.FUNDED) revert DLCNotFunded();
-        if (amount > dlcBTC.balanceOf(dlc.creator))
-            revert InsufficientTokenBalance(
-                dlcBTC.balanceOf(dlc.creator),
-                amount
-            );
+        if (amount > dlcBTC.balanceOf(dlc.creator)) {
+            revert InsufficientTokenBalance(dlcBTC.balanceOf(dlc.creator), amount);
+        }
         if (amount > dlc.valueMinted) {
             revert InsufficientMintedBalance(dlc.valueMinted, amount);
         }
@@ -452,9 +385,7 @@ contract DLCManager is
         return _dlc;
     }
 
-    function getDLCByIndex(
-        uint256 index
-    ) external view returns (DLCLink.DLC memory) {
+    function getDLCByIndex(uint256 index) external view returns (DLCLink.DLC memory) {
         return dlcs[index];
     }
 
@@ -464,16 +395,11 @@ contract DLCManager is
      * @param   endIndex  end index (not inclusive).
      * @return  DLCLink.DLC[]  list of DLCs.
      */
-    function getAllDLCs(
-        uint256 startIndex,
-        uint256 endIndex
-    ) external view returns (DLCLink.DLC[] memory) {
+    function getAllDLCs(uint256 startIndex, uint256 endIndex) external view returns (DLCLink.DLC[] memory) {
         if (startIndex >= endIndex) revert InvalidRange();
         if (endIndex > _index) endIndex = _index;
 
-        DLCLink.DLC[] memory dlcSubset = new DLCLink.DLC[](
-            endIndex - startIndex
-        );
+        DLCLink.DLC[] memory dlcSubset = new DLCLink.DLC[](endIndex - startIndex);
 
         for (uint256 i = startIndex; i < endIndex; i++) {
             dlcSubset[i - startIndex] = dlcs[i];
@@ -486,15 +412,11 @@ contract DLCManager is
         return getDLC(uuid);
     }
 
-    function getAllVaultUUIDsForAddress(
-        address owner
-    ) public view returns (bytes32[] memory) {
+    function getAllVaultUUIDsForAddress(address owner) public view returns (bytes32[] memory) {
         return userVaults[owner];
     }
 
-    function getAllVaultsForAddress(
-        address owner
-    ) public view returns (DLCLink.DLC[] memory) {
+    function getAllVaultsForAddress(address owner) public view returns (DLCLink.DLC[] memory) {
         bytes32[] memory uuids = getAllVaultUUIDsForAddress(owner);
         DLCLink.DLC[] memory vaults = new DLCLink.DLC[](uuids.length);
         for (uint256 i = 0; i < uuids.length; i++) {
@@ -524,16 +446,11 @@ contract DLCManager is
     ////////////////////////////////////////////////////////////////
 
     function _hasAnyRole(address account) internal view returns (bool) {
-        return
-            hasRole(DLC_ADMIN_ROLE, account) ||
-            hasRole(WHITELISTED_CONTRACT, account) ||
-            hasRole(APPROVED_SIGNER, account);
+        return hasRole(DLC_ADMIN_ROLE, account) || hasRole(WHITELISTED_CONTRACT, account)
+            || hasRole(APPROVED_SIGNER, account);
     }
 
-    function grantRole(
-        bytes32 role,
-        address account
-    ) public override(AccessControlDefaultAdminRulesUpgradeable) {
+    function grantRole(bytes32 role, address account) public override(AccessControlDefaultAdminRulesUpgradeable) {
         if (_hasAnyRole(account)) revert IncompatibleRoles();
 
         // role based setup ensures that address can only be added once
@@ -541,15 +458,13 @@ contract DLCManager is
         if (role == APPROVED_SIGNER) _signerCount++;
     }
 
-    function revokeRole(
-        bytes32 role,
-        address account
-    ) public override(AccessControlDefaultAdminRulesUpgradeable) {
+    function revokeRole(bytes32 role, address account) public override(AccessControlDefaultAdminRulesUpgradeable) {
         super.revokeRole(role, account);
 
         if (role == APPROVED_SIGNER) {
-            if (_signerCount == _minimumThreshold)
+            if (_signerCount == _minimumThreshold) {
                 revert ThresholdMinimumReached(_minimumThreshold);
+            }
             _signerCount--;
         }
     }
@@ -563,8 +478,9 @@ contract DLCManager is
     }
 
     function setThreshold(uint16 newThreshold) external onlyAdmin {
-        if (newThreshold < _minimumThreshold)
+        if (newThreshold < _minimumThreshold) {
             revert ThresholdTooLow(_minimumThreshold);
+        }
         _threshold = newThreshold;
         emit SetThreshold(newThreshold);
     }
@@ -582,9 +498,7 @@ contract DLCManager is
         emit WhitelistAddress(addressToWhitelist);
     }
 
-    function unwhitelistAddress(
-        address addressToUnWhitelist
-    ) external onlyAdmin {
+    function unwhitelistAddress(address addressToUnWhitelist) external onlyAdmin {
         _whitelistedAddresses[addressToUnWhitelist] = false;
         emit UnwhitelistAddress(addressToUnWhitelist);
     }
@@ -600,44 +514,34 @@ contract DLCManager is
     }
 
     function setBtcMintFeeRate(uint256 newBtcMintFeeRate) external onlyAdmin {
-        if (newBtcMintFeeRate > 10000)
+        if (newBtcMintFeeRate > 10000) {
             revert FeeRateOutOfBounds(newBtcMintFeeRate);
+        }
         btcMintFeeRate = newBtcMintFeeRate;
         emit SetBtcMintFeeRate(newBtcMintFeeRate);
     }
 
-    function setBtcRedeemFeeRate(
-        uint256 newBtcRedeemFeeRate
-    ) external onlyAdmin {
+    function setBtcRedeemFeeRate(uint256 newBtcRedeemFeeRate) external onlyAdmin {
         btcRedeemFeeRate = newBtcRedeemFeeRate;
         emit SetBtcRedeemFeeRate(newBtcRedeemFeeRate);
     }
 
-    function setBtcFeeRecipient(
-        string calldata btcFeeRecipientToSet
-    ) external onlyAdmin {
+    function setBtcFeeRecipient(string calldata btcFeeRecipientToSet) external onlyAdmin {
         btcFeeRecipient = btcFeeRecipientToSet;
         emit SetBtcFeeRecipient(btcFeeRecipient);
     }
 
-    function setBtcFeeRecipientForVault(
-        bytes32 uuid,
-        string calldata btcFeeRecipientToSet
-    ) external onlyAdmin {
+    function setBtcFeeRecipientForVault(bytes32 uuid, string calldata btcFeeRecipientToSet) external onlyAdmin {
         DLCLink.DLC storage dlc = dlcs[dlcIDsByUUID[uuid]];
         dlc.btcFeeRecipient = btcFeeRecipientToSet;
     }
 
-    function setWhitelistingEnabled(
-        bool isWhitelistingEnabled
-    ) external onlyAdmin {
+    function setWhitelistingEnabled(bool isWhitelistingEnabled) external onlyAdmin {
         whitelistingEnabled = isWhitelistingEnabled;
         emit SetWhitelistingEnabled(isWhitelistingEnabled);
     }
 
-    function transferTokenContractOwnership(
-        address newOwner
-    ) external onlyAdmin {
+    function transferTokenContractOwnership(address newOwner) external onlyAdmin {
         dlcBTC.transferOwnership(newOwner);
         emit TransferTokenContractOwnership(newOwner);
     }

@@ -23,31 +23,17 @@ contract MapWithTimeDataContract {
         elements.enable(addr);
     }
 
-    function atWithTimes(
-        uint256 idx
-    )
-        public
-        view
-        returns (address key, uint48 enabledTime, uint48 disabledTime)
-    {
+    function atWithTimes(uint256 idx) public view returns (address key, uint48 enabledTime, uint48 disabledTime) {
         return elements.atWithTimes(idx);
     }
 
-    function getTimes(
-        address addr
-    ) public view returns (uint48 enabledTime, uint48 disabledTime) {
+    function getTimes(address addr) public view returns (uint48 enabledTime, uint48 disabledTime) {
         return elements.getTimes(addr);
     }
 
-    function wasActiveAt(
-        address addr,
-        uint48 timestamp
-    ) public view returns (bool) {
+    function wasActiveAt(address addr, uint48 timestamp) public view returns (bool) {
         (uint48 enabledTime, uint48 disabledTime) = getTimes(addr);
 
-        return
-            enabledTime != 0 &&
-            enabledTime <= timestamp &&
-            (disabledTime == 0 || disabledTime >= timestamp);
+        return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
     }
 }

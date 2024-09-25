@@ -22,9 +22,7 @@ abstract contract SimpleKeyRegistry32 {
         return keyToOperator[key];
     }
 
-    function getCurrentOperatorKey(
-        address operator
-    ) public view returns (bytes32) {
+    function getCurrentOperatorKey(address operator) public view returns (bytes32) {
         uint208 keyIdx = operatorToIdx[operator].latest();
 
         if (keyIdx == EMPTY_KEY_IDX) {
@@ -34,10 +32,7 @@ abstract contract SimpleKeyRegistry32 {
         return idxToKey[keyIdx];
     }
 
-    function getOperatorKeyAt(
-        address operator,
-        uint48 timestamp
-    ) public view returns (bytes32) {
+    function getOperatorKeyAt(address operator, uint48 timestamp) public view returns (bytes32) {
         uint208 keyIdx = operatorToIdx[operator].upperLookup(timestamp);
 
         if (keyIdx == EMPTY_KEY_IDX) {

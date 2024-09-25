@@ -13,22 +13,15 @@ library MapWithTimeData {
     error AlreadyEnabled();
 
     uint256 private constant ENABLED_TIME_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
-    uint256 private constant DISABLED_TIME_MASK =
-        0xFFFFFFFFFFFFFFFFFFFFFFFF << 48;
+    uint256 private constant DISABLED_TIME_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFF << 48;
 
-    function add(
-        EnumerableMap.AddressToUintMap storage self,
-        address addr
-    ) internal {
+    function add(EnumerableMap.AddressToUintMap storage self, address addr) internal {
         if (!self.set(addr, uint256(0))) {
             revert AlreadyAdded();
         }
     }
 
-    function disable(
-        EnumerableMap.AddressToUintMap storage self,
-        address addr
-    ) internal {
+    function disable(EnumerableMap.AddressToUintMap storage self, address addr) internal {
         uint256 value = self.get(addr);
 
         if (uint48(value) == 0 || uint48(value >> 48) != 0) {
@@ -39,10 +32,7 @@ library MapWithTimeData {
         self.set(addr, value);
     }
 
-    function enable(
-        EnumerableMap.AddressToUintMap storage self,
-        address addr
-    ) internal {
+    function enable(EnumerableMap.AddressToUintMap storage self, address addr) internal {
         uint256 value = self.get(addr);
 
         if (uint48(value) != 0 && uint48(value >> 48) == 0) {
@@ -53,10 +43,7 @@ library MapWithTimeData {
         self.set(addr, value);
     }
 
-    function atWithTimes(
-        EnumerableMap.AddressToUintMap storage self,
-        uint256 idx
-    )
+    function atWithTimes(EnumerableMap.AddressToUintMap storage self, uint256 idx)
         internal
         view
         returns (address key, uint48 enabledTime, uint48 disabledTime)
@@ -67,10 +54,11 @@ library MapWithTimeData {
         disabledTime = uint48(value >> 48);
     }
 
-    function getTimes(
-        EnumerableMap.AddressToUintMap storage self,
-        address addr
-    ) internal view returns (uint48 enabledTime, uint48 disabledTime) {
+    function getTimes(EnumerableMap.AddressToUintMap storage self, address addr)
+        internal
+        view
+        returns (uint48 enabledTime, uint48 disabledTime)
+    {
         uint256 value = self.get(addr);
         enabledTime = uint48(value);
         disabledTime = uint48(value >> 48);

@@ -24,8 +24,8 @@ contract DefaultOperatorRewardsTest is Test {
     }
 
     function test_All() public {
-        uint256 blockTimestamp = (((block.timestamp * block.timestamp) /
-            block.timestamp) * block.timestamp) / block.timestamp;
+        uint256 blockTimestamp =
+            (((block.timestamp * block.timestamp) / block.timestamp) * block.timestamp) / block.timestamp;
         blockTimestamp = blockTimestamp + 1_720_700_948;
         vm.warp(blockTimestamp);
 
@@ -34,11 +34,7 @@ contract DefaultOperatorRewardsTest is Test {
         vm.expectRevert(MapWithTimeData.AlreadyAdded.selector);
         mapWithTimeDataContract.add(alice);
 
-        (
-            address key,
-            uint48 enabledTime,
-            uint48 disabledTime
-        ) = mapWithTimeDataContract.atWithTimes(0);
+        (address key, uint48 enabledTime, uint48 disabledTime) = mapWithTimeDataContract.atWithTimes(0);
         assertEq(key, alice);
         assertEq(enabledTime, 0);
         assertEq(disabledTime, 0);
@@ -47,19 +43,14 @@ contract DefaultOperatorRewardsTest is Test {
         assertEq(enabledTime, 0);
         assertEq(disabledTime, 0);
 
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)),
-            false
-        );
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)), false);
 
         mapWithTimeDataContract.enable(alice);
 
         vm.expectRevert(MapWithTimeData.AlreadyEnabled.selector);
         mapWithTimeDataContract.enable(alice);
 
-        (key, enabledTime, disabledTime) = mapWithTimeDataContract.atWithTimes(
-            0
-        );
+        (key, enabledTime, disabledTime) = mapWithTimeDataContract.atWithTimes(0);
         assertEq(key, alice);
         assertEq(enabledTime, blockTimestamp);
         assertEq(disabledTime, 0);
@@ -68,10 +59,7 @@ contract DefaultOperatorRewardsTest is Test {
         assertEq(enabledTime, blockTimestamp);
         assertEq(disabledTime, 0);
 
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)),
-            true
-        );
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)), true);
 
         blockTimestamp = blockTimestamp + 1;
         vm.warp(blockTimestamp);
@@ -81,9 +69,7 @@ contract DefaultOperatorRewardsTest is Test {
         vm.expectRevert(MapWithTimeData.NotEnabled.selector);
         mapWithTimeDataContract.disable(alice);
 
-        (key, enabledTime, disabledTime) = mapWithTimeDataContract.atWithTimes(
-            0
-        );
+        (key, enabledTime, disabledTime) = mapWithTimeDataContract.atWithTimes(0);
         assertEq(key, alice);
         assertEq(enabledTime, blockTimestamp - 1);
         assertEq(disabledTime, blockTimestamp);
@@ -92,40 +78,17 @@ contract DefaultOperatorRewardsTest is Test {
         assertEq(enabledTime, blockTimestamp - 1);
         assertEq(disabledTime, blockTimestamp);
 
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(
-                alice,
-                uint48(blockTimestamp - 2)
-            ),
-            false
-        );
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(
-                alice,
-                uint48(blockTimestamp - 1)
-            ),
-            true
-        );
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)),
-            true
-        );
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(
-                alice,
-                uint48(blockTimestamp + 1)
-            ),
-            false
-        );
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp - 2)), false);
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp - 1)), true);
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)), true);
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp + 1)), false);
 
         blockTimestamp = blockTimestamp + 1;
         vm.warp(blockTimestamp);
 
         mapWithTimeDataContract.enable(alice);
 
-        (key, enabledTime, disabledTime) = mapWithTimeDataContract.atWithTimes(
-            0
-        );
+        (key, enabledTime, disabledTime) = mapWithTimeDataContract.atWithTimes(0);
         assertEq(key, alice);
         assertEq(enabledTime, blockTimestamp);
         assertEq(disabledTime, 0);
@@ -134,30 +97,9 @@ contract DefaultOperatorRewardsTest is Test {
         assertEq(enabledTime, blockTimestamp);
         assertEq(disabledTime, 0);
 
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(
-                alice,
-                uint48(blockTimestamp - 2)
-            ),
-            false
-        );
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(
-                alice,
-                uint48(blockTimestamp - 1)
-            ),
-            false
-        );
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)),
-            true
-        );
-        assertEq(
-            mapWithTimeDataContract.wasActiveAt(
-                alice,
-                uint48(blockTimestamp + 1)
-            ),
-            true
-        );
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp - 2)), false);
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp - 1)), false);
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp)), true);
+        assertEq(mapWithTimeDataContract.wasActiveAt(alice, uint48(blockTimestamp + 1)), true);
     }
 }

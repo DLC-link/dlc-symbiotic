@@ -20,12 +20,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  * @custom:contact eng@dlc.link
  * @custom:website https://www.dlc.link
  */
-contract DLCBTC is
-    Initializable,
-    ERC20Upgradeable,
-    ERC20PermitUpgradeable,
-    OwnableUpgradeable
-{
+contract DLCBTC is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, OwnableUpgradeable {
     mapping(address => bool) public blacklisted; // deprecated. there is no blacklisting anymore
     address private _minter;
     address private _burner;
@@ -48,8 +43,9 @@ contract DLCBTC is
     }
 
     modifier onlyOwnerOrCCIPMinter() {
-        if (msg.sender != _minter && msg.sender != owner())
+        if (msg.sender != _minter && msg.sender != owner()) {
             revert NotAuthorized();
+        }
         _;
     }
 
