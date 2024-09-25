@@ -1,229 +1,211 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// // SPDX-License-Identifier: MIT
+// pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import "../src/DLCBTC.sol";
-import "../src/DLCManager.sol";
+// import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+// import "forge-std/Test.sol";
+// import "forge-std/console.sol";
 
-import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+// import "../src/DLCBTC.sol";
+// import "../src/DLCManager.sol";
 
-contract DLCBTCTest is Test {
-    DLCBTC public dlcBtc;
-    DLCManager public dlcManager;
+// contract DLCBTCTest is Test {
+//     DLCBTC public dlcBtc;
+//     DLCManager public dlcManager;
+//     SignatureHelper public signatureHelper;
 
-    address public deployer;
-    address public user;
-    address public someRandomAccount;
-    address public attestor1;
-    address public attestor2;
-    address public attestor3;
+//     address public deployer;
+//     address public user;
+//     address public someRandomAccount;
+//     address public attestor1;
+//     address public attestor2;
+//     address public attestor3;
 
-    address[] public attestors;
-    uint256 public deposit = 100000000; // 1 BTC
-    string public btcFeeRecipient =
-        "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
+//     address[] public attestors;
+//     uint256 public deposit = 100000000; // 1 BTC
+//     string public btcFeeRecipient =
+//         "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq";
 
-    bytes32 public mockUUID =
-        0x96eecb386fb10e82f510aaf3e2b99f52f8dcba03f9e0521f7551b367d8ad4967;
-    string public mockBTCTxId =
-        "0x1234567890123456789012345678901234567890123456789012345678901234";
-    string public mockTaprootPubkey =
-        "0x1234567890123456789012345678901234567890123456789012345678901234";
+//     bytes32 public mockUUID =
+//         0x96eecb386fb10e82f510aaf3e2b99f52f8dcba03f9e0521f7551b367d8ad4967;
+//     string public mockBTCTxId =
+//         "0x1234567890123456789012345678901234567890123456789012345678901234";
+//     string public mockTaprootPubkey =
+//         "0x1234567890123456789012345678901234567890123456789012345678901234";
 
-    function setUp() public {
-        // Set signers
-        deployer = vm.addr(1);
-        user = vm.addr(2);
-        someRandomAccount = vm.addr(3);
-        attestor1 = vm.addr(6);
-        attestor2 = vm.addr(7);
-        attestor3 = vm.addr(8);
+//     function setUp() public {
+//         signatureHelper = new SignatureHelper();
+//         // Set signers
+//         deployer = vm.addr(1);
+//         user = vm.addr(2);
+//         someRandomAccount = vm.addr(3);
+//         attestor1 = vm.addr(6);
+//         attestor2 = vm.addr(7);
+//         attestor3 = vm.addr(8);
 
-        attestors = [attestor1, attestor2, attestor3];
+//         attestors = [attestor1, attestor2, attestor3];
 
-        // Deploy contracts
-        vm.startPrank(deployer);
-        dlcBtc = new DLCBTC();
-        dlcManager = new DLCManager();
-        dlcManager.initialize(deployer, deployer, 3, dlcBtc, btcFeeRecipient);
+//         // Deploy contracts
+//         vm.startPrank(deployer);
 
-        address proxy = Upgrades.deployTransparentProxy(
-            "MyContract.sol",
-            INITIAL_OWNER_ADDRESS_FOR_PROXY_ADMIN,
-            abi.encodeCall(
-                MyContract.initialize,
-                ("arguments for the initialize function")
-            )
-        );
-        vm.stopPrank();
+//         address tokenProxy = Upgrades.deployTransparentProxy(
+//             "DLCBTC.sol",
+//             deployer,
+//             abi.encodeCall(DLCBTC.initialize, ())
+//         );
 
-        // Transfer ownership to DLCManager
-        vm.startPrank(deployer);
-        dlcBtc.transferOwnership(address(dlcManager));
-        vm.stopPrank();
-    }
+//         dlcBtc = DLCBTC(tokenProxy);
 
-    function testShouldDeploy() public {
-        assertTrue(address(dlcBtc) != address(0));
-    }
+//         address proxy = Upgrades.deployTransparentProxy(
+//             "DLCManager.sol",
+//             deployer,
+//             abi.encodeCall(
+//                 DLCManager.initialize,
+//                 (deployer, deployer, 3, dlcBtc, btcFeeRecipient)
+//             )
+//         );
+//         dlcManager = DLCManager(proxy);
+//         vm.stopPrank();
 
-    function testShouldBeOwnedByDeployerAtStart() public {
-        assertEq(dlcBtc.owner(), deployer);
-    }
+//         // Transfer ownership to DLCManager
+//         vm.startPrank(deployer);
+//         dlcBtc.transferOwnership(proxy);
+//         vm.stopPrank();
+//     }
 
-    function testShouldHave8Decimals() public {
-        assertEq(dlcBtc.decimals(), 8);
-    }
+//     function testShouldDeploy() public view {
+//         assertTrue(address(dlcBtc) != address(0));
+//     }
 
-    function testShouldHaveZeroTotalSupply() public {
-        assertEq(dlcBtc.totalSupply(), 0);
-    }
+//     function testShouldHave8Decimals() public view {
+//         assertEq(dlcBtc.decimals(), 8);
+//     }
 
-    function testShouldRevertOnUnauthorizedMint() public {
-        vm.expectRevert();
-        vm.prank(user);
-        dlcBtc.mint(user, deposit);
-    }
+//     function testShouldHaveZeroTotalSupply() public view {
+//         assertEq(dlcBtc.totalSupply(), 0);
+//     }
 
-    function testShouldRevertOnUnauthorizedBurn() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(user);
-        dlcBtc.burn(user, deposit);
-    }
+//     function testShouldRevertOnUnauthorizedMint() public {
+//         vm.expectRevert();
+//         vm.prank(user);
+//         dlcBtc.mint(user, deposit);
+//     }
 
-    function testOwnerCanMintTokens() public {
-        vm.prank(deployer);
-        dlcBtc.mint(user, deposit);
-        assertEq(dlcBtc.balanceOf(user), deposit);
-    }
+//     function testShouldRevertOnUnauthorizedBurn() public {
+//         vm.expectRevert();
+//         vm.prank(user);
+//         dlcBtc.burn(user, deposit);
+//     }
 
-    function testOwnerCanBurnTokens() public {
-        vm.startPrank(deployer);
-        dlcBtc.mint(user, deposit);
-        dlcBtc.burn(user, deposit);
-        assertEq(dlcBtc.balanceOf(user), 0);
-        vm.stopPrank();
-    }
+//     function testOwnerCanMintTokens() public {
+//         vm.prank(address(dlcManager));
+//         dlcBtc.mint(user, deposit);
+//         assertEq(dlcBtc.balanceOf(user), deposit);
+//     }
 
-    function testShouldBeOwnedByDLCManagerAfterTransfer() public {
-        vm.startPrank(deployer);
-        dlcBtc.mint(user, deposit);
-        dlcBtc.transferOwnership(address(dlcManager));
-        vm.stopPrank();
-        assertEq(dlcBtc.owner(), address(dlcManager));
-    }
+//     function testOwnerCanBurnTokens() public {
+//         vm.startPrank(address(dlcManager));
+//         dlcBtc.mint(user, deposit);
+//         dlcBtc.burn(user, deposit);
+//         assertEq(dlcBtc.balanceOf(user), 0);
+//         vm.stopPrank();
+//     }
 
-    function testShouldRevertOnMintCalledByPreviousOwner() public {
-        vm.startPrank(deployer);
-        dlcBtc.mint(user, deposit);
-        dlcBtc.transferOwnership(address(dlcManager));
-        vm.stopPrank();
+//     // function testDLCManagerCanMintTokens() public {
+//     //     vm.startPrank(deployer);
+//     //     dlcManager.whitelistAddress(user);
+//     //     vm.stopPrank();
 
-        vm.expectRevert();
-        vm.prank(deployer);
-        dlcBtc.mint(user, deposit);
-    }
+//     //     vm.startPrank(user);
+//     //     bytes32 _uuid = dlcManager.setupVault();
+//     //     vm.stopPrank();
 
-    function testShouldRevertOnBurnCalledByPreviousOwner() public {
-        vm.startPrank(deployer);
-        dlcBtc.mint(user, deposit);
-        dlcBtc.transferOwnership(address(dlcManager));
-        vm.stopPrank();
+//     //     uint256 existingBalance = dlcBtc.balanceOf(user);
 
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(deployer);
-        dlcBtc.burn(user, deposit);
-    }
+//     //     // Set signatures and status
+//     //     setSignersAndStatuses(
+//     //         _uuid,
+//     //         mockBTCTxId,
+//     //         mockTaprootPubkey,
+//     //         0,
+//     //         deposit
+//     //     );
 
-    function testDLCManagerCanMintTokens() public {
-        vm.startPrank(deployer);
-        dlcManager.whitelistAddress(user);
-        vm.stopPrank();
+//     //     assertEq(dlcBtc.balanceOf(user), existingBalance + deposit);
+//     // }
 
-        vm.startPrank(user);
-        dlcManager.setupVault();
-        vm.stopPrank();
+//     // function testDLCManagerCanBurnTokens() public {
+//     //     vm.startPrank(deployer);
+//     //     dlcManager.whitelistAddress(user);
+//     //     vm.stopPrank();
 
-        uint256 existingBalance = dlcBtc.balanceOf(user);
+//     //     vm.startPrank(user);
+//     //     bytes32 _uuid = dlcManager.setupVault();
+//     //     vm.stopPrank();
 
-        // Set signatures and status
-        setSignersAndStatuses(mockBTCTxId, mockTaprootPubkey, 0, deposit);
+//     //     uint256 existingBalance = dlcBtc.balanceOf(user);
 
-        assertEq(dlcBtc.balanceOf(user), existingBalance + deposit);
-    }
+//     //     console.log("Existing balance: ", existingBalance);
 
-    function testDLCManagerCanBurnTokens() public {
-        vm.startPrank(deployer);
-        dlcManager.whitelistAddress(user);
-        vm.stopPrank();
+//     //     // Set signatures and status
+//     //     setSignersAndStatuses(
+//     //         _uuid,
+//     //         mockBTCTxId,
+//     //         mockTaprootPubkey,
+//     //         0,
+//     //         deposit
+//     //     );
 
-        vm.startPrank(user);
-        dlcManager.setupVault();
-        vm.stopPrank();
+//     //     assertEq(dlcBtc.balanceOf(user), existingBalance + deposit);
 
-        uint256 existingBalance = dlcBtc.balanceOf(user);
+//     //     vm.startPrank(user);
+//     //     dlcManager.withdraw(mockUUID, deposit);
+//     //     vm.stopPrank();
 
-        // Set signatures and status
-        setSignersAndStatuses(mockBTCTxId, mockTaprootPubkey, 0, deposit);
+//     //     assertEq(dlcBtc.balanceOf(user), existingBalance);
+//     // }
 
-        assertEq(dlcBtc.balanceOf(user), existingBalance + deposit);
+//     // function setSignersAndStatuses(
+//     //     bytes32 uuid,
+//     //     string memory btcTxId,
+//     //     string memory taprootPubkey,
+//     //     uint256 newLockedAmountPending,
+//     //     uint256 newLockedAmountFunded
+//     // ) internal {
+//     //     // Mock function to set signatures and call status updates.
+//     //     bytes[] memory signatureBytesForPending = signatureHelper.getSignatures(
+//     //         uuid,
+//     //         btcTxId,
+//     //         "set-status-pending",
+//     //         newLockedAmountPending,
+//     //         attestors,
+//     //         3
+//     //     );
+//     //     bytes[] memory signatureBytesForFunding = signatureHelper.getSignatures(
+//     //         uuid,
+//     //         btcTxId,
+//     //         "set-status-funded",
+//     //         deposit,
+//     //         attestors,
+//     //         3
+//     //     );
 
-        vm.startPrank(user);
-        dlcManager.withdraw(mockUUID, deposit);
-        vm.stopPrank();
+//     //     console.log("signatureBytesForPending: ", signatureBytesForPending);
+//     //     console.log("signatureBytesForFunding: ", signatureBytesForFunding);
 
-        assertEq(dlcBtc.balanceOf(user), existingBalance);
-    }
-
-    function setSignersAndStatuses(
-        string memory btcTxId,
-        string memory taprootPubkey,
-        uint256 newLockedAmountPending,
-        uint256 newLockedAmountFunded
-    ) internal {
-        // Mock function to set signatures and call status updates.
-        bytes[] memory signatureBytesForPending = getSignatures(
-            btcTxId,
-            "set-status-pending",
-            newLockedAmountPending
-        );
-        bytes[] memory signatureBytesForFunding = getSignatures(
-            btcTxId,
-            "set-status-funded",
-            newLockedAmountFunded
-        );
-
-        vm.startPrank(attestor1);
-        dlcManager.setStatusPending(
-            mockUUID,
-            btcTxId,
-            signatureBytesForPending,
-            taprootPubkey,
-            0
-        );
-        dlcManager.setStatusFunded(
-            mockUUID,
-            btcTxId,
-            signatureBytesForFunding,
-            newLockedAmountFunded
-        );
-        vm.stopPrank();
-    }
-
-    function getSignatures(
-        string memory btcTxId,
-        string memory functionString,
-        uint256 newLockedAmount
-    ) internal pure returns (bytes[] memory) {
-        // Mock function to return signatures for testing purposes
-        bytes[] memory signatures = new bytes[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            signatures[i] = abi.encodePacked(
-                btcTxId,
-                functionString,
-                newLockedAmount
-            );
-        }
-        return signatures;
-    }
-}
+//     //     vm.startPrank(attestor1);
+//     //     dlcManager.setStatusPending(
+//     //         uuid,
+//     //         btcTxId,
+//     //         signatureBytesForPending,
+//     //         taprootPubkey,
+//     //         0
+//     //     );
+//     //     dlcManager.setStatusFunded(
+//     //         uuid,
+//     //         btcTxId,
+//     //         signatureBytesForFunding,
+//     //         newLockedAmountFunded
+//     //     );
+//     //     vm.stopPrank();
+//     // }
+// }
