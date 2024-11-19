@@ -18,11 +18,15 @@ abstract contract SimpleKeyRegistry32 {
 
     uint208 internal constant EMPTY_KEY_IDX = 0;
 
-    function getOperatorByKey(bytes32 key) public view returns (address) {
+    function getOperatorByKey(
+        bytes32 key
+    ) public view returns (address) {
         return keyToOperator[key];
     }
 
-    function getCurrentOperatorKey(address operator) public view returns (bytes32) {
+    function getCurrentOperatorKey(
+        address operator
+    ) public view returns (bytes32) {
         uint208 keyIdx = operatorToIdx[operator].latest();
 
         if (keyIdx == EMPTY_KEY_IDX) {

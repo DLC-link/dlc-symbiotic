@@ -9,4 +9,13 @@ ast = true
 build_info = true
 extra_output = ["storageLayout"]
 
+[fmt]
+bracket_spacing = false
+int_types = "long"
+line_length = 120
+multiline_func_header = "params_first"
+number_underscore = "thousands"
+quote_style = "double"
+tab_width = 4
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

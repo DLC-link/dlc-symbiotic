@@ -113,7 +113,9 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
         _;
     }
 
-    modifier onlyVaultCreator(bytes32 _uuid) {
+    modifier onlyVaultCreator(
+        bytes32 _uuid
+    ) {
         if (dlcs[dlcIDsByUUID[_uuid]].creator != tx.origin) revert NotOwner();
         _;
     }
@@ -211,7 +213,9 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
      * @param   signatures  Array of signatures.
      * @return  bool  True if there are duplicates, false otherwise.
      */
-    function _hasDuplicates(bytes[] memory signatures) internal pure returns (bool) {
+    function _hasDuplicates(
+        bytes[] memory signatures
+    ) internal pure returns (bool) {
         for (uint256 i = 0; i < signatures.length - 1; i++) {
             for (uint256 j = i + 1; j < signatures.length; j++) {
                 if (keccak256(signatures[i]) == keccak256(signatures[j])) {
@@ -277,11 +281,12 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
      * @param   signatures  Signatures of the Attestors.
      * @param   newValueLocked  New value locked in the DLC.
      */
-    function setStatusFunded(bytes32 uuid, string calldata btcTxId, bytes[] calldata signatures, uint256 newValueLocked)
-        external
-        whenNotPaused
-        onlyApprovedSigners
-    {
+    function setStatusFunded(
+        bytes32 uuid,
+        string calldata btcTxId,
+        bytes[] calldata signatures,
+        uint256 newValueLocked
+    ) external whenNotPaused onlyApprovedSigners {
         _attestorMultisigIsValid(abi.encode(uuid, btcTxId, "set-status-funded", newValueLocked), signatures);
         DLCLink.DLC storage dlc = dlcs[dlcIDsByUUID[uuid]];
 
@@ -378,14 +383,18 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
     //                      VIEW FUNCTIONS                        //
     ////////////////////////////////////////////////////////////////
 
-    function getDLC(bytes32 uuid) public view returns (DLCLink.DLC memory) {
+    function getDLC(
+        bytes32 uuid
+    ) public view returns (DLCLink.DLC memory) {
         DLCLink.DLC memory _dlc = dlcs[dlcIDsByUUID[uuid]];
         if (_dlc.uuid == bytes32(0)) revert DLCNotFound();
         if (_dlc.uuid != uuid) revert DLCNotFound();
         return _dlc;
     }
 
-    function getDLCByIndex(uint256 index) external view returns (DLCLink.DLC memory) {
+    function getDLCByIndex(
+        uint256 index
+    ) external view returns (DLCLink.DLC memory) {
         return dlcs[index];
     }
 
@@ -408,15 +417,21 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
         return dlcSubset;
     }
 
-    function getVault(bytes32 uuid) public view returns (DLCLink.DLC memory) {
+    function getVault(
+        bytes32 uuid
+    ) public view returns (DLCLink.DLC memory) {
         return getDLC(uuid);
     }
 
-    function getAllVaultUUIDsForAddress(address owner) public view returns (bytes32[] memory) {
+    function getAllVaultUUIDsForAddress(
+        address owner
+    ) public view returns (bytes32[] memory) {
         return userVaults[owner];
     }
 
-    function getAllVaultsForAddress(address owner) public view returns (DLCLink.DLC[] memory) {
+    function getAllVaultsForAddress(
+        address owner
+    ) public view returns (DLCLink.DLC[] memory) {
         bytes32[] memory uuids = getAllVaultUUIDsForAddress(owner);
         DLCLink.DLC[] memory vaults = new DLCLink.DLC[](uuids.length);
         for (uint256 i = 0; i < uuids.length; i++) {
@@ -425,7 +440,9 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
         return vaults;
     }
 
-    function isWhitelisted(address account) external view returns (bool) {
+    function isWhitelisted(
+        address account
+    ) external view returns (bool) {
         return _whitelistedAddresses[account];
     }
 
@@ -445,7 +462,9 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
     //                      ADMIN FUNCTIONS                       //
     ////////////////////////////////////////////////////////////////
 
-    function _hasAnyRole(address account) internal view returns (bool) {
+    function _hasAnyRole(
+        address account
+    ) internal view returns (bool) {
         return hasRole(DLC_ADMIN_ROLE, account) || hasRole(WHITELISTED_CONTRACT, account)
             || hasRole(APPROVED_SIGNER, account);
     }
@@ -477,7 +496,9 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
         _unpause();
     }
 
-    function setThreshold(uint16 newThreshold) external onlyAdmin {
+    function setThreshold(
+        uint16 newThreshold
+    ) external onlyAdmin {
         if (newThreshold < _minimumThreshold) {
             revert ThresholdTooLow(_minimumThreshold);
         }
@@ -485,48 +506,66 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
         emit SetThreshold(newThreshold);
     }
 
-    function setTSSCommitment(bytes32 commitment) external onlyAdmin {
+    function setTSSCommitment(
+        bytes32 commitment
+    ) external onlyAdmin {
         tssCommitment = commitment;
     }
 
-    function setAttestorGroupPubKey(string calldata pubKey) external onlyAdmin {
+    function setAttestorGroupPubKey(
+        string calldata pubKey
+    ) external onlyAdmin {
         attestorGroupPubKey = pubKey;
     }
 
-    function whitelistAddress(address addressToWhitelist) external onlyAdmin {
+    function whitelistAddress(
+        address addressToWhitelist
+    ) external onlyAdmin {
         _whitelistedAddresses[addressToWhitelist] = true;
         emit WhitelistAddress(addressToWhitelist);
     }
 
-    function unwhitelistAddress(address addressToUnWhitelist) external onlyAdmin {
+    function unwhitelistAddress(
+        address addressToUnWhitelist
+    ) external onlyAdmin {
         _whitelistedAddresses[addressToUnWhitelist] = false;
         emit UnwhitelistAddress(addressToUnWhitelist);
     }
 
-    function setMinimumDeposit(uint256 newMinimumDeposit) external onlyAdmin {
+    function setMinimumDeposit(
+        uint256 newMinimumDeposit
+    ) external onlyAdmin {
         minimumDeposit = newMinimumDeposit;
         emit SetMinimumDeposit(newMinimumDeposit);
     }
 
-    function setMaximumDeposit(uint256 newMaximumDeposit) external onlyAdmin {
+    function setMaximumDeposit(
+        uint256 newMaximumDeposit
+    ) external onlyAdmin {
         maximumDeposit = newMaximumDeposit;
         emit SetMaximumDeposit(newMaximumDeposit);
     }
 
-    function setBtcMintFeeRate(uint256 newBtcMintFeeRate) external onlyAdmin {
-        if (newBtcMintFeeRate > 10000) {
+    function setBtcMintFeeRate(
+        uint256 newBtcMintFeeRate
+    ) external onlyAdmin {
+        if (newBtcMintFeeRate > 10_000) {
             revert FeeRateOutOfBounds(newBtcMintFeeRate);
         }
         btcMintFeeRate = newBtcMintFeeRate;
         emit SetBtcMintFeeRate(newBtcMintFeeRate);
     }
 
-    function setBtcRedeemFeeRate(uint256 newBtcRedeemFeeRate) external onlyAdmin {
+    function setBtcRedeemFeeRate(
+        uint256 newBtcRedeemFeeRate
+    ) external onlyAdmin {
         btcRedeemFeeRate = newBtcRedeemFeeRate;
         emit SetBtcRedeemFeeRate(newBtcRedeemFeeRate);
     }
 
-    function setBtcFeeRecipient(string calldata btcFeeRecipientToSet) external onlyAdmin {
+    function setBtcFeeRecipient(
+        string calldata btcFeeRecipientToSet
+    ) external onlyAdmin {
         btcFeeRecipient = btcFeeRecipientToSet;
         emit SetBtcFeeRecipient(btcFeeRecipient);
     }
@@ -536,21 +575,29 @@ contract DLCManager is Initializable, AccessControlDefaultAdminRulesUpgradeable,
         dlc.btcFeeRecipient = btcFeeRecipientToSet;
     }
 
-    function setWhitelistingEnabled(bool isWhitelistingEnabled) external onlyAdmin {
+    function setWhitelistingEnabled(
+        bool isWhitelistingEnabled
+    ) external onlyAdmin {
         whitelistingEnabled = isWhitelistingEnabled;
         emit SetWhitelistingEnabled(isWhitelistingEnabled);
     }
 
-    function transferTokenContractOwnership(address newOwner) external onlyAdmin {
+    function transferTokenContractOwnership(
+        address newOwner
+    ) external onlyAdmin {
         dlcBTC.transferOwnership(newOwner);
         emit TransferTokenContractOwnership(newOwner);
     }
 
-    function setMinterOnTokenContract(address minter) external onlyAdmin {
+    function setMinterOnTokenContract(
+        address minter
+    ) external onlyAdmin {
         dlcBTC.setMinter(minter);
     }
 
-    function setBurnerOnTokenContract(address burner) external onlyAdmin {
+    function setBurnerOnTokenContract(
+        address burner
+    ) external onlyAdmin {
         dlcBTC.setBurner(burner);
     }
 }

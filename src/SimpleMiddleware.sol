@@ -17,7 +17,7 @@ import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
 import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
-import {MapWithTimeData} from "./MapWithTimeData.sol";
+import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 
 contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
@@ -69,7 +69,9 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
     EnumerableMap.AddressToUintMap private operators;
     EnumerableMap.AddressToUintMap private vaults;
 
-    modifier updateStakeCache(uint48 epoch) {
+    modifier updateStakeCache(
+        uint48 epoch
+    ) {
         if (!totalStakeCached[epoch]) {
             calcAndCacheStakes(epoch);
         }
@@ -101,11 +103,15 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         subnetworksCnt = 1;
     }
 
-    function getEpochStartTs(uint48 epoch) public view returns (uint48 timestamp) {
+    function getEpochStartTs(
+        uint48 epoch
+    ) public view returns (uint48 timestamp) {
         return START_TIME + epoch * EPOCH_DURATION;
     }
 
-    function getEpochAtTs(uint48 timestamp) public view returns (uint48 epoch) {
+    function getEpochAtTs(
+        uint48 timestamp
+    ) public view returns (uint48 epoch) {
         return (timestamp - START_TIME) / EPOCH_DURATION;
     }
 
@@ -140,15 +146,21 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         updateKey(operator, key);
     }
 
-    function pauseOperator(address operator) external onlyOwner {
+    function pauseOperator(
+        address operator
+    ) external onlyOwner {
         operators.disable(operator);
     }
 
-    function unpauseOperator(address operator) external onlyOwner {
+    function unpauseOperator(
+        address operator
+    ) external onlyOwner {
         operators.enable(operator);
     }
 
-    function unregisterOperator(address operator) external onlyOwner {
+    function unregisterOperator(
+        address operator
+    ) external onlyOwner {
         (, uint48 disabledTime) = operators.getTimes(operator);
 
         if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
@@ -158,7 +170,9 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         operators.remove(operator);
     }
 
-    function registerVault(address vault) external onlyOwner {
+    function registerVault(
+        address vault
+    ) external onlyOwner {
         if (vaults.contains(vault)) {
             revert VaultAlreadyRegistred();
         }
@@ -182,15 +196,21 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         vaults.enable(vault);
     }
 
-    function pauseVault(address vault) external onlyOwner {
+    function pauseVault(
+        address vault
+    ) external onlyOwner {
         vaults.disable(vault);
     }
 
-    function unpauseVault(address vault) external onlyOwner {
+    function unpauseVault(
+        address vault
+    ) external onlyOwner {
         vaults.enable(vault);
     }
 
-    function unregisterVault(address vault) external onlyOwner {
+    function unregisterVault(
+        address vault
+    ) external onlyOwner {
         (, uint48 disabledTime) = vaults.getTimes(vault);
 
         if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
@@ -200,7 +220,9 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         vaults.remove(vault);
     }
 
-    function setSubnetworksCnt(uint256 _subnetworksCnt) external onlyOwner {
+    function setSubnetworksCnt(
+        uint256 _subnetworksCnt
+    ) external onlyOwner {
         if (subnetworksCnt >= _subnetworksCnt) {
             revert InvalidSubnetworksCnt();
         }
@@ -233,14 +255,18 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         return stake;
     }
 
-    function getTotalStake(uint48 epoch) public view returns (uint256) {
+    function getTotalStake(
+        uint48 epoch
+    ) public view returns (uint256) {
         if (totalStakeCached[epoch]) {
             return totalStakeCache[epoch];
         }
         return _calcTotalStake(epoch);
     }
 
-    function getValidatorSet(uint48 epoch) public view returns (ValidatorData[] memory validatorsData) {
+    function getValidatorSet(
+        uint48 epoch
+    ) public view returns (ValidatorData[] memory validatorsData) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         validatorsData = new ValidatorData[](operators.length());
@@ -259,7 +285,7 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
                 continue;
             }
 
-            uint256 stake = getOperatorStake(operator, epochStartTs);
+            uint256 stake = getOperatorStake(operator, epoch);
 
             validatorsData[valIdx++] = ValidatorData(stake, key);
         }
@@ -310,7 +336,9 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         }
     }
 
-    function calcAndCacheStakes(uint48 epoch) public returns (uint256 totalStake) {
+    function calcAndCacheStakes(
+        uint48 epoch
+    ) public returns (uint256 totalStake) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
@@ -330,7 +358,7 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
                 continue;
             }
 
-            uint256 operatorStake = getOperatorStake(operator, epochStartTs);
+            uint256 operatorStake = getOperatorStake(operator, epoch);
             operatorStakeCache[epoch][operator] = operatorStake;
 
             totalStake += operatorStake;
@@ -340,7 +368,9 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         totalStakeCache[epoch] = totalStake;
     }
 
-    function _calcTotalStake(uint48 epoch) private view returns (uint256 totalStake) {
+    function _calcTotalStake(
+        uint48 epoch
+    ) private view returns (uint256 totalStake) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
@@ -360,7 +390,7 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
                 continue;
             }
 
-            uint256 operatorStake = getOperatorStake(operator, epochStartTs);
+            uint256 operatorStake = getOperatorStake(operator, epoch);
             totalStake += operatorStake;
         }
     }
@@ -369,9 +399,13 @@ contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
     }
 
-    function _slashVault(uint48 timestamp, address vault, bytes32 subnetwork, address operator, uint256 amount)
-        private
-    {
+    function _slashVault(
+        uint48 timestamp,
+        address vault,
+        bytes32 subnetwork,
+        address operator,
+        uint256 amount
+    ) private {
         address slasher = IVault(vault).slasher();
         uint256 slasherType = IEntity(slasher).TYPE();
         if (slasherType == INSTANT_SLASHER_TYPE) {
