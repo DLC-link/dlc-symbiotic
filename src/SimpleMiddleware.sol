@@ -16,7 +16,7 @@ import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
-import {SimpleKeyRegistry32} from "./SimpleKeyRegistry32.sol";
+import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 
 contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
