@@ -10,6 +10,7 @@
   "solidity.remappings": [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-    "@symbiotic/=lib/core/src/"
+    "@symbiotic/=lib/core/src/",
+    "@symbiotic-burners/=lib/burners/src/"
   ]
 }
