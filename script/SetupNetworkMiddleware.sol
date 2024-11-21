@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import {Script} from "forge-std/Script.sol";
-import {SimpleMiddleware} from "src/SimpleMiddleware.sol";
+import {NetworkMiddleware} from "src/iBTC_NetworkMiddleware.sol";
 
 contract SetupNetworkMiddleware is Script {
     // Using anvil's default addresses
@@ -39,7 +39,7 @@ contract SetupNetworkMiddleware is Script {
 
         vm.startBroadcast();
 
-        SimpleMiddleware middleware = new SimpleMiddleware(
+        NetworkMiddleware middleware = new NetworkMiddleware(
             NETWORK, OPERATOR_REGISTRY, NETWORK_REGISTRY, NETWORK_OPTIN, OWNER, EPOCH_DURATION, SLASHING_WINDOW
         );
 
