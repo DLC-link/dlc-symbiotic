@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import {MigratableEntity} from "./common/MigratableEntity.sol";
-import {VaultStorage} from "./VaultStorage.sol";
+import {MigratableEntity} from "@symbiotic/contracts/common/MigratableEntity.sol";
+import {VaultStorage} from "@symbiotic/contracts/vault/VaultStorage.sol";
 
-import {IBaseDelegator} from "./interfaces/delegator/IBaseDelegator.sol";
-import {IBaseSlasher} from "./interfaces/slasher/IBaseSlasher.sol";
-import {IRegistry} from "./interfaces/common/IRegistry.sol";
-import {IVault} from "./interfaces/vault/IVault.sol";
-
-import {Checkpoints} from "./lib/Checkpoints.sol";
-import {ERC4626Math} from "./lib/ERC4626Math.sol";
+import {IBaseDelegator} from "@symbiotic/interfaces/delegator/IBaseDelegator.sol";
+import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
+import {IRegistry} from "@symbiotic/interfaces/common/IRegistry.sol";
+import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
+import {Checkpoints} from "@symbiotic/contracts/libraries/Checkpoints.sol";
+import {ERC4626Math} from "@symbiotic/contracts/libraries/ERC4626Math.sol";
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";

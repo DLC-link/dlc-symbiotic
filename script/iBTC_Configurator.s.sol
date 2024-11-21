@@ -3,9 +3,9 @@ pragma solidity 0.8.25;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {VaultConfigurator} from "../src/iBTC_VaultConfigurator.sol";
-import {VaultFactory} from "../src/factories/VaultFactory.sol";
-import {DelegatorFactory} from "../src/factories/DelegatorFactory.sol";
-import {SlasherFactory} from "../src/factories/SlasherFactory.sol";
+import {VaultFactory} from "@symbiotic/contracts/VaultFactory.sol";
+import {DelegatorFactory} from "@symbiotic/contracts/DelegatorFactory.sol";
+import {SlasherFactory} from "@symbiotic/contracts/SlasherFactory.sol";
 
 contract DeployVaultConfigurator is Script {
     // Replace with the correct checksummed addresses
@@ -18,11 +18,7 @@ contract DeployVaultConfigurator is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy the VaultConfigurator contract
-        VaultConfigurator vaultConfigurator = new VaultConfigurator(
-            VAULT_FACTORY,
-            DELEGATOR_FACTORY,
-            SLASHER_FACTORY
-        );
+        VaultConfigurator vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
 
         // Log the deployed address
         console2.log("VaultConfigurator deployed at:", address(vaultConfigurator));

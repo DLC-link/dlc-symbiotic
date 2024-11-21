@@ -2,13 +2,13 @@
 pragma solidity 0.8.25;
 
 // import {SelfDestruct} from "src/common/SelfDestruct.sol"; we don't need selfDestruct
-import {UintRequests} from "./common/UintRequests.sol";
-import {IiBTC_Burner} from "./interfaces/IiBTC_Burner.sol";
-import {IiBTC_Treasury} from "./interfaces/IiBTC_Treasury.sol";
-
+import {UintRequests} from "@symbiotic-burners/contracts/common/UintRequests.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+
+import {IiBTC_Burner} from "./interfaces/IiBTC_Burner.sol";
+import {IiBTC_Treasury} from "./interfaces/IiBTC_Treasury.sol";
 
 contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
     using Math for uint256;
@@ -37,10 +37,8 @@ contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
         uint256 amount = IERC20(Collateral).balanceOf(address(this));
 
         // Fetch the maximum and minimum withdrawal amounts from the treasury
-        uint256 maxWithdrawalAmount = IiBTC_Treasury(IBTCTreasury)
-            .withdrawRequestMaximum();
-        uint256 minWithdrawalAmount = IiBTC_Treasury(IBTCTreasury)
-            .withdrawRequestMinimum();
+        uint256 maxWithdrawalAmount = IiBTC_Treasury(IBTCTreasury).withdrawRequestMaximum();
+        uint256 minWithdrawalAmount = IiBTC_Treasury(IBTCTreasury).withdrawRequestMinimum();
 
         // Calculate the number of full requests that can be made using the maximum withdrawal amount
         uint256 requests = amount / maxWithdrawalAmount;
@@ -60,9 +58,7 @@ contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
 
         // Calculate the range of request IDs that will be created
         uint256 requestsMinusOne = requests - 1; // Total requests minus one
-        firstRequestId =
-            IiBTC_Treasury(IBTCTreasury).getLastrequestIdCreated() +
-            1; // First request ID
+        firstRequestId = IiBTC_Treasury(IBTCTreasury).getLastrequestIdCreated() + 1; // First request ID
         lastRequestId = firstRequestId + requestsMinusOne; // Last request ID
 
         // Initialize `requestId` with the first request ID
@@ -74,9 +70,7 @@ contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
             _addRequestId(requestId);
 
             // Create a withdrawal request for the maximum withdrawal amount
-            IiBTC_Treasury(IBTCTreasury).createWithdrawRequest(
-                maxWithdrawalAmount
-            );
+            IiBTC_Treasury(IBTCTreasury).createWithdrawRequest(maxWithdrawalAmount);
         }
 
         // Add the final request ID to the tracking list
@@ -84,10 +78,7 @@ contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
 
         // For the last request, calculate the remaining amount and ensure it doesn't exceed the maximum limit
         IiBTC_Treasury(IBTCTreasury).createWithdrawRequest(
-            Math.min(
-                amount - requestsMinusOne * maxWithdrawalAmount,
-                maxWithdrawalAmount
-            )
+            Math.min(amount - requestsMinusOne * maxWithdrawalAmount, maxWithdrawalAmount)
         );
 
         // Emit an event to record the range of request IDs that were created
@@ -116,12 +107,7 @@ contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
     /**
      * @inheritdoc IERC721Receiver
      */
-    function onERC721Received(
-        address,
-        address,
-        uint256,
-        bytes calldata
-    ) external view returns (bytes4) {
+    function onERC721Received(address, address, uint256, bytes calldata) external view returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
 

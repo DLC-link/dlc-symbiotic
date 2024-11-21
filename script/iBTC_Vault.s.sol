@@ -3,18 +3,18 @@ pragma solidity 0.8.25;
 
 import {Script, console2} from "forge-std/Script.sol";
 
-import {iBTC_Vault} from "../src/iBTC_Vault.sol";
+import {IMigratablesFactory} from "@symbiotic/interfaces/common/IMigratablesFactory.sol";
+import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
+import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
+import {IBaseDelegator} from "@symbiotic/interfaces/delegator/IBaseDelegator.sol";
+import {INetworkRestakeDelegator} from "@symbiotic/interfaces/delegator/INetworkRestakeDelegator.sol";
+import {IFullRestakeDelegator} from "@symbiotic/interfaces/delegator/IFullRestakeDelegator.sol";
+import {IOperatorSpecificDelegator} from "@symbiotic/interfaces/delegator/IOperatorSpecificDelegator.sol";
+import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
+import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
+import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 
-import {IMigratablesFactory} from "../../src/interfaces/common/IMigratablesFactory.sol";
-import {IVault} from "../../src/interfaces/vault/IVault.sol";
-import {IVaultConfigurator} from "../../src/interfaces/IVaultConfigurator.sol";
-import {IBaseDelegator} from "../../src/interfaces/delegator/IBaseDelegator.sol";
-import {INetworkRestakeDelegator} from "../../src/interfaces/delegator/INetworkRestakeDelegator.sol";
-import {IFullRestakeDelegator} from "../../src/interfaces/delegator/IFullRestakeDelegator.sol";
-import {IOperatorSpecificDelegator} from "../../src/interfaces/delegator/IOperatorSpecificDelegator.sol";
-import {IBaseSlasher} from "../../src/interfaces/slasher/IBaseSlasher.sol";
-import {ISlasher} from "../../src/interfaces/slasher/ISlasher.sol";
-import {IVetoSlasher} from "../../src/interfaces/slasher/IVetoSlasher.sol";
+import {iBTC_Vault} from "../src/iBTC_Vault.sol";
 
 contract VaultScript is Script {
     function run() public {
@@ -22,16 +22,16 @@ contract VaultScript is Script {
         address owner = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
         address collateral = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
         address burner = 0x81295Ffa36826dc643CF8CFcBF22e08227b91851;
-        uint48 epochDuration = 604800; // 7days
+        uint48 epochDuration = 604_800; // 7days
         address[] memory whitelistedDepositors;
         uint256 depositLimit = 1e9; // 10iBTC
         uint64 delegatorIndex = 0; // NetworkRestakeDelegator
         address hook = 0x0000000000000000000000000000000000000000;
         bool withSlasher = true;
         uint64 slasherIndex = 1; // vetoSlasher
-        uint48 vetoDuration = 86400; // 1 day
+        uint48 vetoDuration = 86_400; // 1 day
         vm.startBroadcast();
-        (, , address deployer) = vm.readCallers();
+        (,, address deployer) = vm.readCallers();
 
         bool depositWhitelist = whitelistedDepositors.length != 0;
 
@@ -55,15 +55,9 @@ contract VaultScript is Script {
         if (hook != address(0) && hook != owner) {
             roleHolders = 2;
         }
-        address[] memory networkLimitSetRoleHolders = new address[](
-            roleHolders
-        );
-        address[] memory operatorNetworkLimitSetRoleHolders = new address[](
-            roleHolders
-        );
-        address[] memory operatorNetworkSharesSetRoleHolders = new address[](
-            roleHolders
-        );
+        address[] memory networkLimitSetRoleHolders = new address[](roleHolders);
+        address[] memory operatorNetworkLimitSetRoleHolders = new address[](roleHolders);
+        address[] memory operatorNetworkSharesSetRoleHolders = new address[](roleHolders);
         networkLimitSetRoleHolders[0] = owner;
         operatorNetworkLimitSetRoleHolders[0] = owner;
         operatorNetworkSharesSetRoleHolders[0] = owner;
@@ -115,63 +109,41 @@ contract VaultScript is Script {
         bytes memory slasherParams;
         if (slasherIndex == 0) {
             slasherParams = abi.encode(
-                ISlasher.InitParams({
-                    baseParams: IBaseSlasher.BaseParams({
-                        isBurnerHook: burner != address(0)
-                    })
-                })
+                ISlasher.InitParams({baseParams: IBaseSlasher.BaseParams({isBurnerHook: burner != address(0)})})
             );
         } else if (slasherIndex == 1) {
             slasherParams = abi.encode(
                 IVetoSlasher.InitParams({
-                    baseParams: IBaseSlasher.BaseParams({
-                        isBurnerHook: burner != address(0)
-                    }),
+                    baseParams: IBaseSlasher.BaseParams({isBurnerHook: burner != address(0)}),
                     vetoDuration: vetoDuration,
                     resolverSetEpochsDelay: 3
                 })
             );
         }
 
-        (
-            address vault_,
-            address delegator_,
-            address slasher_
-        ) = IVaultConfigurator(vaultConfigurator).create(
-                IVaultConfigurator.InitParams({
-                    version: 1,
-                    owner: owner,
-                    vaultParams: vaultParams,
-                    delegatorIndex: delegatorIndex,
-                    delegatorParams: delegatorParams,
-                    withSlasher: withSlasher,
-                    slasherIndex: slasherIndex,
-                    slasherParams: slasherParams
-                })
-            );
+        (address vault_, address delegator_, address slasher_) = IVaultConfigurator(vaultConfigurator).create(
+            IVaultConfigurator.InitParams({
+                version: 1,
+                owner: owner,
+                vaultParams: vaultParams,
+                delegatorIndex: delegatorIndex,
+                delegatorParams: delegatorParams,
+                withSlasher: withSlasher,
+                slasherIndex: slasherIndex,
+                slasherParams: slasherParams
+            })
+        );
 
         if (depositWhitelist) {
             iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), owner);
-            iBTC_Vault(vault_).grantRole(
-                iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(),
-                deployer
-            );
+            iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
 
             for (uint256 i; i < whitelistedDepositors.length; ++i) {
-                iBTC_Vault(vault_).setDepositorWhitelistStatus(
-                    whitelistedDepositors[i],
-                    true
-                );
+                iBTC_Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
             }
 
-            iBTC_Vault(vault_).renounceRole(
-                iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(),
-                deployer
-            );
-            iBTC_Vault(vault_).renounceRole(
-                iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(),
-                deployer
-            );
+            iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+            iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         }
 
         console2.log("Vault: ", vault_);

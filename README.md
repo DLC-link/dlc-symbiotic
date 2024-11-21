@@ -1,19 +1,22 @@
-## Foundry
+# dlc-symbiotic
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
-
-Foundry consists of:
-
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
+Repository for the dlc-link Symbiotic integration.
 
 ## Usage
+
+You can start a local Sepolia fork using:
+
+```shell
+anvil --fork-url https://eth-sepolia.g.alchemy.com/v2/your-api-key
+```
+
+And deploy the NetworkMiddleware contract using:
+
+```shell
+forge script SetupNetworkMiddleware --rpc-url http://localhost:8545 --broadcast -vvvv --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+```
+
+## Development
 
 ### Build
 

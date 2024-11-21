@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IUintRequests} from "../common/UintRequests.sol";
+import {IUintRequests} from "@symbiotic-burners/contracts/common/UintRequests.sol";
 
 interface IiBTC_Burner is IUintRequests {
     error InsufficientWithdrawal();
@@ -13,7 +13,6 @@ interface IiBTC_Burner is IUintRequests {
      * @param lastRequestId last request ID that was created
      */
     event TriggerWithdrawal(address indexed caller, uint256 firstRequestId, uint256 lastRequestId);
-
 
     /**
      * @notice Get an address of the collateral.
@@ -34,5 +33,4 @@ interface IiBTC_Burner is IUintRequests {
     function triggerWithdrawal(
         uint256 maxRequests
     ) external returns (uint256 firstRequestId, uint256 lastRequestId);
-
 }

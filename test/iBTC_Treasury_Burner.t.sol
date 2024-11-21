@@ -33,11 +33,7 @@ contract iBTC_Treasury_BurnerTest is Test {
         mockCollateral = new MockERC20();
 
         // Deploy Treasury
-        treasury = new iBTC_Treasury(
-            address(mockCollateral),
-            MAX_WITHDRAW_AMOUNT,
-            MIN_WITHDRAW_AMOUNT
-        );
+        treasury = new iBTC_Treasury(address(mockCollateral), MAX_WITHDRAW_AMOUNT, MIN_WITHDRAW_AMOUNT);
 
         // Deploy Burner
         vm.startPrank(burnerDeployer);
@@ -71,8 +67,7 @@ contract iBTC_Treasury_BurnerTest is Test {
         vm.startPrank(burnerDeployer);
 
         // Trigger a withdrawal using the burner
-        (uint256 firstRequestId, uint256 lastRequestId) = burner
-            .triggerWithdrawal(2);
+        (uint256 firstRequestId, uint256 lastRequestId) = burner.triggerWithdrawal(2);
 
         // Verify request creation
         assertEq(firstRequestId, 1); // First request ID should be 1
@@ -110,17 +105,15 @@ contract iBTC_Treasury_BurnerTest is Test {
         vm.stopPrank();
 
         assertEq(mockCollateral.balanceOf(user), 300 ether);
-        vm.prank(address(this)); 
+        vm.prank(address(this));
         treasury.processWithdrawals(2);
 
         uint256 finalUserBalance = mockCollateral.balanceOf(user);
-        console.log("Final user balance:", finalUserBalance); 
-        assertEq(finalUserBalance, 500 ether); 
+        console.log("Final user balance:", finalUserBalance);
+        assertEq(finalUserBalance, 500 ether);
 
-        uint256 finalTreasuryBalance = mockCollateral.balanceOf(
-            address(treasury)
-        );
-        console.log("Final treasury balance:", finalTreasuryBalance); 
-        assertEq(finalTreasuryBalance, 0 ether); 
+        uint256 finalTreasuryBalance = mockCollateral.balanceOf(address(treasury));
+        console.log("Final treasury balance:", finalTreasuryBalance);
+        assertEq(finalTreasuryBalance, 0 ether);
     }
 }

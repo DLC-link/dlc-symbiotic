@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import {BaseSlasher} from "./common/slasher/BaseSlasher.sol";
-import {DelegatorFactory} from "./factories/DelegatorFactory.sol";
-import {SlasherFactory} from "./factories/SlasherFactory.sol";
-import {VaultFactory} from "./factories/VaultFactory.sol";
-import {iBTC_Vault} from "./iBTC_Vault.sol";
+import {BaseSlasher} from "@symbiotic/contracts/slasher/BaseSlasher.sol";
+import {DelegatorFactory} from "@symbiotic/contracts/DelegatorFactory.sol";
+import {SlasherFactory} from "@symbiotic/contracts/SlasherFactory.sol";
+import {VaultFactory} from "@symbiotic/contracts/VaultFactory.sol";
+import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
 
-import {IVaultConfigurator} from "./interfaces/IVaultConfigurator.sol";
+import {iBTC_Vault} from "./iBTC_Vault.sol";
 
 contract VaultConfigurator is IVaultConfigurator {
     /**
