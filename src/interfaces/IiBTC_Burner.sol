@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IUintRequests} from "../common/UintRequests.sol";
 
-interface IdlcBTCBurner is IUintRequests {
+interface IiBTC_Burner is IUintRequests {
     error InsufficientWithdrawal();
 
     /**
@@ -23,7 +23,7 @@ interface IdlcBTCBurner is IUintRequests {
     /**
      * @notice Get an address of the dlcBTC Exit contract.
      */
-    function DLCBTCEXIT() external view returns (address);
+    function iBTCTreasury() external view returns (address);
 
     /**
      * @notice Trigger a withdrawal of BTC from the collateral's underlying asset.

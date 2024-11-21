@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IdlcBTCEXIT {
-    function getLastTokenIdCreated() external view returns (uint256);
+interface IiBTC_Treasury {
+    function getLastrequestIdCreated() external view returns (uint256);
 
     function withdrawRequestMaximum() external view returns (uint256);
 

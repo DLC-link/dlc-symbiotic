@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {IAddressRequests} from "../../interfaces/common/IAddressRequests.sol";
+import {IAddressRequests} from "lib/burners/src/interfaces/common/IAddressRequests.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
