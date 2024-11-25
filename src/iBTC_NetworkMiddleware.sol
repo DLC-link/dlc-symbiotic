@@ -19,7 +19,7 @@ import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 
-contract SimpleMiddleware is SimpleKeyRegistry32, Ownable {
+contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;

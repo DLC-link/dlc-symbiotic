@@ -2,6 +2,10 @@
 
 Repository for the dlc-link Symbiotic integration.
 
+### Slashing
+
+<img src="./assets/slash_flow.png" alt="slash_flow" width="100%" />
+
 ## Usage
 
 You can start a local Sepolia fork using:
