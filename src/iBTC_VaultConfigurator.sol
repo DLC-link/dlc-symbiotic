@@ -6,7 +6,7 @@ import {DelegatorFactory} from "@symbiotic/contracts/DelegatorFactory.sol";
 import {SlasherFactory} from "@symbiotic/contracts/SlasherFactory.sol";
 import {VaultFactory} from "@symbiotic/contracts/VaultFactory.sol";
 import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
-
+import {IVault} from "core/src/interfaces/vault/IVault.sol";
 import {iBTC_Vault} from "./iBTC_Vault.sol";
 
 contract VaultConfigurator is IVaultConfigurator {
@@ -34,9 +34,7 @@ contract VaultConfigurator is IVaultConfigurator {
     /**
      * @inheritdoc IVaultConfigurator
      */
-    function create(
-        InitParams memory params
-    ) public returns (address vault, address delegator, address slasher) {
+    function create(InitParams memory params) public returns (address vault, address delegator, address slasher) {
         vault = VaultFactory(VAULT_FACTORY).create(params.version, params.owner, params.vaultParams);
 
         delegator =
