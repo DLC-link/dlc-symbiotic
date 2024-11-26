@@ -18,6 +18,8 @@ import {IVaultConfigurator} from "core/src/interfaces/IVaultConfigurator.sol";
 import {IRegistry} from "core/src/interfaces/common/IRegistry.sol";
 
 contract iBTC_NetworkMiddlewareTest is Test {
+    uint256 sepoliaFork;
+    string SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
     address constant NETWORKMIDDLEWARESERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address constant NETWORKREGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
     address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
@@ -47,6 +49,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     iBTC_Vault public iBTC_vault;
 
     function setUp() public {
+        sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
         address[] memory whitelistedDepositors;
 
         uint256 depositLimit = 1e10;
@@ -147,8 +150,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
         console.log("Slasher: ", slasher_);
 
         vm.startPrank(address(iBTC_middleware));
-        NetworkRegistry(0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9).registerNetwork();
-        NetworkMiddlewareService(0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3).setMiddleware(address(iBTC_middleware));
+        NetworkRegistry(NETWORKREGISTRY).registerNetwork();
+        NetworkMiddlewareService(NETWORKMIDDLEWARESERVICE).setMiddleware(address(iBTC_middleware));
         vm.stopPrank();
     }
 
