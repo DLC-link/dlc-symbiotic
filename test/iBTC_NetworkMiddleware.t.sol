@@ -5,7 +5,9 @@ import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {NetworkMiddlewareService} from "core/src/contracts/service/NetworkMiddlewareService.sol";
 import {NetworkRegistry} from "core/src/contracts/NetworkRegistry.sol";
+import {OperatorRegistry} from "core/src/contracts/OperatorRegistry.sol";
 import {NetworkMiddleware} from "src/iBTC_NetworkMiddleware.sol";
+import {OptInService} from "core/src/contracts/service/OptInService.sol";
 import {iBTC_Vault} from "src/iBTC_Vault.sol";
 import {VaultConfigurator} from "src/iBTC_VaultConfigurator.sol";
 import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
@@ -20,21 +22,22 @@ import {IRegistry} from "core/src/interfaces/common/IRegistry.sol";
 contract iBTC_NetworkMiddlewareTest is Test {
     uint256 sepoliaFork;
     string SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
-    address constant NETWORKMIDDLEWARESERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
-    address constant NETWORKREGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
-    address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
+    address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
+    address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
     address constant NETWORK_OPTIN = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
     address constant COLLATTERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4;
     address constant DELEGATOR_FACTORY = 0x890CA3f95E0f40a79885B7400926544B2214B03f;
     address constant SLASHER_FACTORY = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
+    address constant OPTSERVICE = 0x95CC0a052ae33941877c9619835A233D21D57351;
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9;
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
 
     address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
     uint48 constant EPOCH_DURATION = 7 days;
+    // uint48 constant NETWORK_EPOCH = 5 days;
     uint48 constant SLASHING_WINDOW = 7 days;
     uint48 vetoDuration = 0 days;
 
@@ -150,17 +153,20 @@ contract iBTC_NetworkMiddlewareTest is Test {
         console.log("Slasher: ", slasher_);
 
         vm.startPrank(address(iBTC_middleware));
-        NetworkRegistry(NETWORKREGISTRY).registerNetwork();
-        NetworkMiddlewareService(NETWORKMIDDLEWARESERVICE).setMiddleware(address(iBTC_middleware));
+        NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
+        NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE).setMiddleware(address(iBTC_middleware));
         vm.stopPrank();
     }
 
     function testRegisterOperator() public {
-        vm.startPrank(OWNER);
-
         address operator = address(0x1234);
         bytes32 key = keccak256(abi.encodePacked("operator_key"));
+        vm.startPrank(operator);
+        OperatorRegistry(OPERATOR_REGISTRY).registerOperator();
+        OptInService(OPTSERVICE).optIn(vaults[0]);
+        vm.stopPrank();
 
+        vm.startPrank(OWNER);
         iBTC_middleware.registerOperator(operator, key);
 
         (uint48 enabledTime, uint48 disabledTime) = iBTC_middleware.getOperatorInfo(operator);
