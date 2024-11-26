@@ -30,7 +30,5 @@ interface IiBTC_Burner is IUintRequests {
      * @return firstRequestId first request ID that was created
      * @return lastRequestId last request ID that was created
      */
-    function triggerWithdrawal(
-        uint256 maxRequests
-    ) external returns (uint256 firstRequestId, uint256 lastRequestId);
+    function triggerWithdrawal(uint256 maxRequests) external returns (uint256 firstRequestId, uint256 lastRequestId);
 }

@@ -85,22 +85,16 @@ contract IBTC is Initializable, ERC20Upgradeable, ERC20PermitUpgradeable, Ownabl
         _burn(from, amount);
     }
 
-    function burn(
-        uint256 amount
-    ) external onlyCCIPBurner {
+    function burn(uint256 amount) external onlyCCIPBurner {
         _burn(msg.sender, amount);
     }
 
-    function setMinter(
-        address minter
-    ) external onlyOwner {
+    function setMinter(address minter) external onlyOwner {
         _minter = minter;
         emit MinterSet(minter);
     }
 
-    function setBurner(
-        address burner
-    ) external onlyOwner {
+    function setBurner(address burner) external onlyOwner {
         _burner = burner;
         emit BurnerSet(burner);
     }

@@ -34,9 +34,7 @@ contract VaultConfigurator is IVaultConfigurator {
     /**
      * @inheritdoc IVaultConfigurator
      */
-    function create(
-        InitParams memory params
-    ) public returns (address vault, address delegator, address slasher) {
+    function create(InitParams memory params) public returns (address vault, address delegator, address slasher) {
         vault = VaultFactory(VAULT_FACTORY).create(params.version, params.owner, params.vaultParams);
 
         delegator =
