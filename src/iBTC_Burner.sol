@@ -30,7 +30,9 @@ contract iBTC_Burner is UintRequests, IiBTC_Burner, IERC721Receiver {
      * This function triggers a withdrawal by creating one or more withdrawal requests.
      * It splits the total collateral balance into multiple requests based on the maximum withdrawal limit.
      */
-    function triggerWithdrawal(uint256 maxRequests) external returns (uint256 firstRequestId, uint256 lastRequestId) {
+    function triggerWithdrawal(
+        uint256 maxRequests
+    ) external returns (uint256 firstRequestId, uint256 lastRequestId) {
         // Get the current balance of the COLLATERAL token held by this contract
         uint256 amount = IERC20(Collateral).balanceOf(address(this));
 

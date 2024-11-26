@@ -62,7 +62,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
     /**
      * @inheritdoc IVault
      */
-    function activeBalanceOf(address account) public view returns (uint256) {
+    function activeBalanceOf(
+        address account
+    ) public view returns (uint256) {
         return ERC4626Math.previewRedeem(activeSharesOf(account), activeStake(), activeShares());
     }
 
@@ -77,7 +79,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
     /**
      * @inheritdoc IVault
      */
-    function slashableBalanceOf(address account) external view returns (uint256) {
+    function slashableBalanceOf(
+        address account
+    ) external view returns (uint256) {
         uint256 epoch = currentEpoch();
         return activeBalanceOf(account) + withdrawalsOf(epoch, account) + withdrawalsOf(epoch + 1, account);
     }
@@ -262,7 +266,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
     /**
      * @inheritdoc IVault
      */
-    function setDepositWhitelist(bool status) external nonReentrant onlyRole(DEPOSIT_WHITELIST_SET_ROLE) {
+    function setDepositWhitelist(
+        bool status
+    ) external nonReentrant onlyRole(DEPOSIT_WHITELIST_SET_ROLE) {
         if (depositWhitelist == status) {
             revert AlreadySet();
         }
@@ -295,7 +301,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
     /**
      * @inheritdoc IVault
      */
-    function setIsDepositLimit(bool status) external nonReentrant onlyRole(IS_DEPOSIT_LIMIT_SET_ROLE) {
+    function setIsDepositLimit(
+        bool status
+    ) external nonReentrant onlyRole(IS_DEPOSIT_LIMIT_SET_ROLE) {
         if (isDepositLimit == status) {
             revert AlreadySet();
         }
@@ -308,7 +316,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
     /**
      * @inheritdoc IVault
      */
-    function setDepositLimit(uint256 limit) external nonReentrant onlyRole(DEPOSIT_LIMIT_SET_ROLE) {
+    function setDepositLimit(
+        uint256 limit
+    ) external nonReentrant onlyRole(DEPOSIT_LIMIT_SET_ROLE) {
         if (depositLimit == limit) {
             revert AlreadySet();
         }
@@ -318,7 +328,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
         emit SetDepositLimit(limit);
     }
 
-    function setDelegator(address delegator_) external nonReentrant {
+    function setDelegator(
+        address delegator_
+    ) external nonReentrant {
         if (isDelegatorInitialized) {
             revert DelegatorAlreadyInitialized();
         }
@@ -338,7 +350,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
         emit SetDelegator(delegator_);
     }
 
-    function setSlasher(address slasher_) external nonReentrant {
+    function setSlasher(
+        address slasher_
+    ) external nonReentrant {
         if (isSlasherInitialized) {
             revert SlasherAlreadyInitialized();
         }
@@ -382,7 +396,9 @@ contract iBTC_Vault is VaultStorage, MigratableEntity, AccessControlUpgradeable,
         emit Withdraw(msg.sender, claimer, withdrawnAssets, burnedShares, mintedShares);
     }
 
-    function _claim(uint256 epoch) internal returns (uint256 amount) {
+    function _claim(
+        uint256 epoch
+    ) internal returns (uint256 amount) {
         if (epoch >= currentEpoch()) {
             revert InvalidEpoch();
         }

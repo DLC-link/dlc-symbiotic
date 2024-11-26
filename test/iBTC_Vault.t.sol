@@ -334,7 +334,9 @@ contract VaultTest is Test {
         );
     }
 
-    function test_CreateRevertInvalidCollateral(uint48 epochDuration) public {
+    function test_CreateRevertInvalidCollateral(
+        uint48 epochDuration
+    ) public {
         epochDuration = uint48(bound(epochDuration, 1, 50 weeks));
 
         address[] memory networkLimitSetRoleHolders = new address[](1);
@@ -381,7 +383,9 @@ contract VaultTest is Test {
         );
     }
 
-    function test_CreateRevertMissingRoles1(uint48 epochDuration) public {
+    function test_CreateRevertMissingRoles1(
+        uint48 epochDuration
+    ) public {
         epochDuration = uint48(bound(epochDuration, 1, 50 weeks));
 
         uint64 lastVersion = vaultFactory.lastVersion();
@@ -410,7 +414,9 @@ contract VaultTest is Test {
         );
     }
 
-    function test_CreateRevertMissingRoles2(uint48 epochDuration) public {
+    function test_CreateRevertMissingRoles2(
+        uint48 epochDuration
+    ) public {
         epochDuration = uint48(bound(epochDuration, 1, 50 weeks));
 
         uint64 lastVersion = vaultFactory.lastVersion();
@@ -439,7 +445,9 @@ contract VaultTest is Test {
         );
     }
 
-    function test_CreateRevertMissingRoles3(uint48 epochDuration) public {
+    function test_CreateRevertMissingRoles3(
+        uint48 epochDuration
+    ) public {
         epochDuration = uint48(bound(epochDuration, 1, 50 weeks));
 
         uint64 lastVersion = vaultFactory.lastVersion();
@@ -468,7 +476,9 @@ contract VaultTest is Test {
         );
     }
 
-    function test_CreateRevertMissingRoles4(uint48 epochDuration) public {
+    function test_CreateRevertMissingRoles4(
+        uint48 epochDuration
+    ) public {
         epochDuration = uint48(bound(epochDuration, 1, 50 weeks));
 
         uint64 lastVersion = vaultFactory.lastVersion();
@@ -497,7 +507,9 @@ contract VaultTest is Test {
         );
     }
 
-    function test_CreateRevertMissingRoles5(uint48 epochDuration) public {
+    function test_CreateRevertMissingRoles5(
+        uint48 epochDuration
+    ) public {
         epochDuration = uint48(bound(epochDuration, 1, 50 weeks));
 
         uint64 lastVersion = vaultFactory.lastVersion();
@@ -1380,7 +1392,9 @@ contract VaultTest is Test {
         assertEq(iBTCVault.slashableBalanceOf(bob), amount2);
     }
 
-    function test_DepositRevertInvalidOnBehalfOf(uint256 amount1) public {
+    function test_DepositRevertInvalidOnBehalfOf(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -1501,7 +1515,9 @@ contract VaultTest is Test {
         assertEq(iBTCVault.totalStake(), amount1 - amount2 - amount3);
     }
 
-    function test_WithdrawRevertInvalidClaimer(uint256 amount1) public {
+    function test_WithdrawRevertInvalidClaimer(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -1515,7 +1531,9 @@ contract VaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_WithdrawRevertInsufficientWithdrawal(uint256 amount1) public {
+    function test_WithdrawRevertInsufficientWithdrawal(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -1527,7 +1545,9 @@ contract VaultTest is Test {
         _withdraw(alice, 0);
     }
 
-    function test_WithdrawRevertTooMuchWithdraw(uint256 amount1) public {
+    function test_WithdrawRevertTooMuchWithdraw(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -1641,7 +1661,9 @@ contract VaultTest is Test {
         assertEq(iBTCVault.totalStake(), amount1 - withdrawnAssets2 - withdrawnAssets3);
     }
 
-    function test_RedeemRevertInvalidClaimer(uint256 amount1) public {
+    function test_RedeemRevertInvalidClaimer(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -1655,7 +1677,9 @@ contract VaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_RedeemRevertInsufficientRedeemption(uint256 amount1) public {
+    function test_RedeemRevertInsufficientRedeemption(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -1667,7 +1691,9 @@ contract VaultTest is Test {
         _redeem(alice, 0);
     }
 
-    function test_RedeemRevertTooMuchRedeem(uint256 amount1) public {
+    function test_RedeemRevertTooMuchRedeem(
+        uint256 amount1
+    ) public {
         amount1 = bound(amount1, 1, 100 * 10 ** 18);
 
         uint48 epochDuration = 1;
@@ -2181,7 +2207,9 @@ contract VaultTest is Test {
         _deposit(alice, depositAmount);
     }
 
-    function test_SetDepositLimitToNull(uint256 limit1) public {
+    function test_SetDepositLimitToNull(
+        uint256 limit1
+    ) public {
         uint48 epochDuration = 1;
 
         iBTCVault = _getVault(epochDuration);
@@ -2222,7 +2250,9 @@ contract VaultTest is Test {
         vm.stopPrank();
     }
 
-    function test_SetDepositLimitRevertAlreadySet(uint256 limit) public {
+    function test_SetDepositLimitRevertAlreadySet(
+        uint256 limit
+    ) public {
         uint48 epochDuration = 1;
 
         iBTCVault = _getVault(epochDuration);
@@ -2654,7 +2684,9 @@ contract VaultTest is Test {
     //     assertLt(gasStruct.gasSpent1 - gasStruct.gasSpent2, 10_000);
     // }
 
-    function _getVault(uint48 epochDuration) internal returns (iBTC_Vault) {
+    function _getVault(
+        uint48 epochDuration
+    ) internal returns (iBTC_Vault) {
         address[] memory networkLimitSetRoleHolders = new address[](1);
         networkLimitSetRoleHolders[0] = alice;
         address[] memory operatorNetworkSharesSetRoleHolders = new address[](1);
@@ -2699,10 +2731,9 @@ contract VaultTest is Test {
         return iBTC_Vault(vault_);
     }
 
-    function _getVaultAndDelegatorAndSlasher(uint48 epochDuration)
-        internal
-        returns (iBTC_Vault, FullRestakeDelegator, Slasher)
-    {
+    function _getVaultAndDelegatorAndSlasher(
+        uint48 epochDuration
+    ) internal returns (iBTC_Vault, FullRestakeDelegator, Slasher) {
         address[] memory networkLimitSetRoleHolders = new address[](1);
         networkLimitSetRoleHolders[0] = alice;
         address[] memory operatorNetworkLimitSetRoleHolders = new address[](1);
@@ -2747,7 +2778,9 @@ contract VaultTest is Test {
         return (iBTC_Vault(vault_), FullRestakeDelegator(delegator_), Slasher(slasher_));
     }
 
-    function _registerOperator(address user) internal {
+    function _registerOperator(
+        address user
+    ) internal {
         vm.startPrank(user);
         operatorRegistry.registerOperator();
         vm.stopPrank();
@@ -2816,13 +2849,17 @@ contract VaultTest is Test {
         vm.stopPrank();
     }
 
-    function _optInOperatorVault(address user) internal {
+    function _optInOperatorVault(
+        address user
+    ) internal {
         vm.startPrank(user);
         operatorVaultOptInService.optIn(address(iBTCVault));
         vm.stopPrank();
     }
 
-    function _optOutOperatorVault(address user) internal {
+    function _optOutOperatorVault(
+        address user
+    ) internal {
         vm.startPrank(user);
         operatorVaultOptInService.optOut(address(iBTCVault));
         vm.stopPrank();

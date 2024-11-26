@@ -62,7 +62,9 @@ contract iBTC_Treasury is ERC721, Ownable {
      * @dev Allows users to create a withdrawal request.
      * Transfers collateral from the caller to the treasury and mints an ERC721 token.
      */
-    function createWithdrawRequest(uint256 amount) external {
+    function createWithdrawRequest(
+        uint256 amount
+    ) external {
         require(amount >= minWithdrawAmount, "Amount below minimum limit");
         require(amount <= maxWithdrawAmount, "Amount exceeds maximum limit");
 
@@ -86,7 +88,9 @@ contract iBTC_Treasury is ERC721, Ownable {
      * @dev Finalizes a withdrawal request and burns the corresponding token.
      * Transfers the collateral back to the token owner.
      */
-    function finalizeWithdrawal(uint256 requestId) external onlyOwner {
+    function finalizeWithdrawal(
+        uint256 requestId
+    ) external onlyOwner {
         require(!finalizedWithdrawals[requestId], "Already finalized");
 
         address requester = ownerOf(requestId);
@@ -109,7 +113,9 @@ contract iBTC_Treasury is ERC721, Ownable {
      * @dev Batch process withdrawals up to a specified token ID.
      * Only callable by the contract owner.
      */
-    function processWithdrawals(uint256 _lastrequestIdToProcess) external onlyOwner {
+    function processWithdrawals(
+        uint256 _lastrequestIdToProcess
+    ) external onlyOwner {
         for (uint256 requestId = 1; requestId <= _lastrequestIdToProcess; requestId++) {
             if (_exits(requestId) && !finalizedWithdrawals[requestId]) {
                 address requester = ownerOf(requestId);
@@ -133,7 +139,9 @@ contract iBTC_Treasury is ERC721, Ownable {
         return minWithdrawAmount;
     }
 
-    function _exits(uint256 requestId) internal view returns (bool) {
+    function _exits(
+        uint256 requestId
+    ) internal view returns (bool) {
         return ownerOf(requestId) != address(0);
     }
 }

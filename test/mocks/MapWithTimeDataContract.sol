@@ -11,23 +11,33 @@ contract MapWithTimeDataContract {
 
     EnumerableMap.AddressToUintMap internal elements;
 
-    function add(address addr) public {
+    function add(
+        address addr
+    ) public {
         elements.add(addr);
     }
 
-    function disable(address addr) public {
+    function disable(
+        address addr
+    ) public {
         elements.disable(addr);
     }
 
-    function enable(address addr) public {
+    function enable(
+        address addr
+    ) public {
         elements.enable(addr);
     }
 
-    function atWithTimes(uint256 idx) public view returns (address key, uint48 enabledTime, uint48 disabledTime) {
+    function atWithTimes(
+        uint256 idx
+    ) public view returns (address key, uint48 enabledTime, uint48 disabledTime) {
         return elements.atWithTimes(idx);
     }
 
-    function getTimes(address addr) public view returns (uint48 enabledTime, uint48 disabledTime) {
+    function getTimes(
+        address addr
+    ) public view returns (uint48 enabledTime, uint48 disabledTime) {
         return elements.getTimes(addr);
     }
 
