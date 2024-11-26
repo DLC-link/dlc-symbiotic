@@ -69,9 +69,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     EnumerableMap.AddressToUintMap private operators;
     EnumerableMap.AddressToUintMap private vaults;
 
-    modifier updateStakeCache(
-        uint48 epoch
-    ) {
+    modifier updateStakeCache(uint48 epoch) {
         if (!totalStakeCached[epoch]) {
             calcAndCacheStakes(epoch);
         }
@@ -103,16 +101,30 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         subnetworksCnt = 1;
     }
 
-    function getEpochStartTs(
-        uint48 epoch
-    ) public view returns (uint48 timestamp) {
+    function getEpochStartTs(uint48 epoch) public view returns (uint48 timestamp) {
         return START_TIME + epoch * EPOCH_DURATION;
     }
 
-    function getEpochAtTs(
-        uint48 timestamp
-    ) public view returns (uint48 epoch) {
+    function getEpochAtTs(uint48 timestamp) public view returns (uint48 epoch) {
         return (timestamp - START_TIME) / EPOCH_DURATION;
+    }
+
+    function isOperatorRegistered(address operator) public view returns (bool) {
+        return operators.contains(operator);
+    }
+
+    function getOperatorInfo(address operator) public view returns (uint48, uint48) {
+        (uint48 enabledTime, uint48 disabledTime) = operators.getTimes(operator);
+        return (enabledTime, disabledTime);
+    }
+
+    function isVaultRegistered(address vault) public view returns (bool) {
+        return vaults.contains(vault);
+    }
+
+    function getVaultInfo(address vault) public view returns (uint48, uint48) {
+        (uint48 enabledTime, uint48 disabledTime) = vaults.getTimes(vault);
+        return (enabledTime, disabledTime);
     }
 
     function getCurrentEpoch() public view returns (uint48 epoch) {
@@ -146,21 +158,15 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         updateKey(operator, key);
     }
 
-    function pauseOperator(
-        address operator
-    ) external onlyOwner {
+    function pauseOperator(address operator) external onlyOwner {
         operators.disable(operator);
     }
 
-    function unpauseOperator(
-        address operator
-    ) external onlyOwner {
+    function unpauseOperator(address operator) external onlyOwner {
         operators.enable(operator);
     }
 
-    function unregisterOperator(
-        address operator
-    ) external onlyOwner {
+    function unregisterOperator(address operator) external onlyOwner {
         (, uint48 disabledTime) = operators.getTimes(operator);
 
         if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
@@ -170,9 +176,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         operators.remove(operator);
     }
 
-    function registerVault(
-        address vault
-    ) external onlyOwner {
+    function registerVault(address vault) external onlyOwner {
         if (vaults.contains(vault)) {
             revert VaultAlreadyRegistred();
         }
@@ -196,21 +200,15 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         vaults.enable(vault);
     }
 
-    function pauseVault(
-        address vault
-    ) external onlyOwner {
+    function pauseVault(address vault) external onlyOwner {
         vaults.disable(vault);
     }
 
-    function unpauseVault(
-        address vault
-    ) external onlyOwner {
+    function unpauseVault(address vault) external onlyOwner {
         vaults.enable(vault);
     }
 
-    function unregisterVault(
-        address vault
-    ) external onlyOwner {
+    function unregisterVault(address vault) external onlyOwner {
         (, uint48 disabledTime) = vaults.getTimes(vault);
 
         if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
@@ -255,18 +253,14 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         return stake;
     }
 
-    function getTotalStake(
-        uint48 epoch
-    ) public view returns (uint256) {
+    function getTotalStake(uint48 epoch) public view returns (uint256) {
         if (totalStakeCached[epoch]) {
             return totalStakeCache[epoch];
         }
         return _calcTotalStake(epoch);
     }
 
-    function getValidatorSet(
-        uint48 epoch
-    ) public view returns (ValidatorData[] memory validatorsData) {
+    function getValidatorSet(uint48 epoch) public view returns (ValidatorData[] memory validatorsData) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         validatorsData = new ValidatorData[](operators.length());
@@ -333,9 +327,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         }
     }
 
-    function calcAndCacheStakes(
-        uint48 epoch
-    ) public returns (uint256 totalStake) {
+    function calcAndCacheStakes(uint48 epoch) public returns (uint256 totalStake) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
@@ -365,9 +357,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         totalStakeCache[epoch] = totalStake;
     }
 
-    function _calcTotalStake(
-        uint48 epoch
-    ) private view returns (uint256 totalStake) {
+    function _calcTotalStake(uint48 epoch) private view returns (uint256 totalStake) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         // for epoch older than SLASHING_WINDOW total stake can be invalidated (use cache)
