@@ -110,6 +110,32 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         return (timestamp - START_TIME) / EPOCH_DURATION;
     }
 
+    function isOperatorRegistered(
+        address operator
+    ) public view returns (bool) {
+        return operators.contains(operator);
+    }
+
+    function getOperatorInfo(
+        address operator
+    ) public view returns (uint48, uint48) {
+        (uint48 enabledTime, uint48 disabledTime) = operators.getTimes(operator);
+        return (enabledTime, disabledTime);
+    }
+
+    function isVaultRegistered(
+        address vault
+    ) public view returns (bool) {
+        return vaults.contains(vault);
+    }
+
+    function getVaultInfo(
+        address vault
+    ) public view returns (uint48, uint48) {
+        (uint48 enabledTime, uint48 disabledTime) = vaults.getTimes(vault);
+        return (enabledTime, disabledTime);
+    }
+
     function getCurrentEpoch() public view returns (uint48 epoch) {
         return getEpochAtTs(Time.timestamp());
     }
