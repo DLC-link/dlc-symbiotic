@@ -14,9 +14,8 @@ import {IOperatorSpecificDelegator} from "@symbiotic/interfaces/delegator/IOpera
 import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
 import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
+import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 
-import {iBTC_Treasury} from "../src/iBTC_Treasury.sol";
-import {iBTC_Burner} from "../src/iBTC_Burner.sol";
 import {VaultConfigurator} from "../src/iBTC_VaultConfigurator.sol";
 import {iBTC_Vault} from "../src/iBTC_Vault.sol";
 
@@ -25,7 +24,7 @@ contract DeployAll is Script {
     address constant COLLATERAL_ADDRESS = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74; // eth sepolia
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9; // 10 iBTC
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
-    uint256 deployerPrivateKey = uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80); //NOTE
+    uint256 deployerPrivateKey = uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80); //NOTE replace deploy Key
 
     // Replace with the correct checksummed addresses
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4; // Replace with deployed VaultFactory address
@@ -41,16 +40,11 @@ contract DeployAll is Script {
         uint64 delegatorIndex = 0; // NetworkRestakeDelegator
         address hook = 0x0000000000000000000000000000000000000000;
         bool withSlasher = true;
-        uint64 slasherIndex = 1; // vetoSlasher
+        uint64 slasherIndex = 1; // vetoSlasher = 1, Basic Slasher = 0
         uint48 vetoDuration = 86_400; // 1 day
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy the iBTC_Treasury contract
-        iBTC_Treasury treasury = new iBTC_Treasury(COLLATERAL_ADDRESS, MAX_WITHDRAW_AMOUNT, MIN_WITHDRAW_AMOUNT);
-
-        // Deploy the iBTC_Burner contract
-        iBTC_Burner burner = new iBTC_Burner(COLLATERAL_ADDRESS, address(treasury));
-
+        BurnerRouter burner = new BurnerRouter();
         VaultConfigurator vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
 
         // Log the deployed address
