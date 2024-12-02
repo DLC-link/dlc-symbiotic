@@ -29,12 +29,13 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4;
     address constant DELEGATOR_FACTORY = 0x890CA3f95E0f40a79885B7400926544B2214B03f;
     address constant SLASHER_FACTORY = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
-    address constant OPERATOR_NET_OPTIN = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
+    address constant NEWTORK_OPTIN_SERVICE = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
+    address constant VAULT_OPTIN_SERVICE = 0x95CC0a052ae33941877c9619835A233D21D57351;
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9;
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
 
-    address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-    address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+    address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // first address network should be a multisig contract
+    address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
     uint48 constant EPOCH_DURATION = 7 days;
     // uint48 constant NETWORK_EPOCH = 5 days;
     uint48 constant SLASHING_WINDOW = 7 days;
@@ -45,6 +46,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     address[] vaults;
 
+    OptInService network_optIn_service;
+    OptInService vault_optIn_service;
     NetworkMiddleware public iBTC_middleware;
     BurnerRouter public burner;
     VaultConfigurator public vaultConfigurator;
@@ -131,27 +134,33 @@ contract iBTC_NetworkMiddlewareTest is Test {
         }
         vm.stopPrank();
 
-        vm.prank(vault_);
-        NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
-        // vm.prank(NETWORK);
+        network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
+        vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
+        //NOTICE
+        // vm.prank(vault_);
         // NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
+        vm.prank(NETWORK);
+        NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
 
         vaults.push(vault_);
         vm.startPrank(OWNER);
         iBTC_middleware = new NetworkMiddleware(
-            vault_, OPERATOR_REGISTRY, NETWORK_REGISTRY, OPERATOR_NET_OPTIN, OWNER, EPOCH_DURATION, SLASHING_WINDOW
+            NETWORK,
+            OPERATOR_REGISTRY,
+            NETWORK_REGISTRY,
+            VAULT_FACTORY,
+            NEWTORK_OPTIN_SERVICE,
+            VAULT_OPTIN_SERVICE,
+            OWNER,
+            EPOCH_DURATION,
+            SLASHING_WINDOW
         );
-        for (uint256 i = 0; i < vaults.length; ++i) {
-            iBTC_middleware.registerVault(vaults[i]);
-        }
 
-        for (uint256 i = 0; i < operators.length; ++i) {
-            iBTC_middleware.registerOperator(operators[i], keys[i]);
-        }
         vm.stopPrank();
         console.log("Vault: ", vault_);
         console.log("Delegator: ", delegator_);
         console.log("Slasher: ", slasher_);
+        assertEq(IVault(vault_).slasher(), slasher_);
 
         vm.startPrank(address(iBTC_middleware));
         NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
@@ -164,7 +173,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 key = keccak256(abi.encodePacked("operator_key"));
         vm.startPrank(operator);
         OperatorRegistry(OPERATOR_REGISTRY).registerOperator();
-        OptInService(OPERATOR_NET_OPTIN).optIn(vaults[0]);
+        network_optIn_service.optIn(NETWORK);
         vm.stopPrank();
         vm.startPrank(OWNER);
         iBTC_middleware.registerOperator(operator, key);
@@ -197,7 +206,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
     function testRegisterVault() public {
         vm.startPrank(OWNER);
 
-        vm.expectRevert();
         iBTC_middleware.registerVault(vaults[0]);
 
         bool isVaultRegistered = iBTC_middleware.isVaultRegistered(vaults[0]);
@@ -207,6 +215,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     }
 
     function testPauseAndUnpauseVault() public {
+        testRegisterVault();
         vm.startPrank(OWNER);
 
         iBTC_middleware.pauseVault(vaults[0]);
@@ -233,6 +242,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint48 epoch = iBTC_middleware.getCurrentEpoch();
 
         vm.startPrank(address(iBTC_middleware));
+        // NOTE figure out how to stake some into it.
         iBTC_middleware.calcAndCacheStakes(epoch);
         vm.stopPrank();
 
@@ -247,5 +257,12 @@ contract iBTC_NetworkMiddlewareTest is Test {
         // assertEq(updatedStake, initialStake - slashAmount, "Stake should be reduced by slashed amount");
 
         vm.stopPrank();
+    }
+
+    function testOptInVault() public {
+        testRegisterOperator();
+        address operator = address(0x1234);
+        vm.prank(operator);
+        vault_optIn_service.optIn(vaults[0]);
     }
 }

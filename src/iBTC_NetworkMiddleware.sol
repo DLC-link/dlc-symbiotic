@@ -31,6 +31,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     error OperatorNotRegistred();
     error OperarorGracePeriodNotPassed();
     error OperatorAlreadyRegistred();
+    error OperatorNotEnoughStaked();
 
     error VaultAlreadyRegistred();
     error VaultEpochTooShort();
@@ -52,8 +53,10 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
 
     address public immutable NETWORK;
     address public immutable OPERATOR_REGISTRY;
+    address public immutable NETWORK_REGISTRY;
     address public immutable VAULT_REGISTRY;
     address public immutable OPERATOR_NET_OPTIN;
+    address public immutable OPERATOR_VAULT_OPTIN;
     address public immutable OWNER;
     uint48 public immutable EPOCH_DURATION;
     uint48 public immutable SLASHING_WINDOW;
@@ -65,7 +68,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     uint256 public subnetworksCnt;
     mapping(uint48 => uint256) public totalStakeCache;
     mapping(uint48 => bool) public totalStakeCached;
-    mapping(uint48 => mapping(address => uint256)) public operatorStakeCache;
+    mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
     EnumerableMap.AddressToUintMap private operators;
     EnumerableMap.AddressToUintMap private vaults;
 
@@ -81,8 +84,10 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     constructor(
         address _network,
         address _operatorRegistry,
+        address _networkRegistry,
         address _vaultRegistry,
         address _operatorNetOptin,
+        address _operatorVaultOptin,
         address _owner,
         uint48 _epochDuration,
         uint48 _slashingWindow
@@ -96,6 +101,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         NETWORK = _network;
         OWNER = _owner;
         OPERATOR_REGISTRY = _operatorRegistry;
+        NETWORK_REGISTRY = _networkRegistry;
         VAULT_REGISTRY = _vaultRegistry;
         OPERATOR_NET_OPTIN = _operatorNetOptin;
         SLASHING_WINDOW = _slashingWindow;
@@ -159,7 +165,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         }
 
         updateKey(operator, key);
-
         operators.add(operator);
         operators.enable(operator);
     }
@@ -196,6 +201,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         operators.remove(operator);
     }
 
+    // NOTICE: WHY we need to register Vautl? should it be network?
     function registerVault(
         address vault
     ) external onlyOwner {
