@@ -18,6 +18,7 @@ import {IVetoSlasher} from "core/src/interfaces/slasher/IVetoSlasher.sol";
 import {IBaseSlasher} from "core/src/interfaces/slasher/IBaseSlasher.sol";
 import {IVaultConfigurator} from "core/src/interfaces/IVaultConfigurator.sol";
 import {IRegistry} from "core/src/interfaces/common/IRegistry.sol";
+import {IBTC} from "test/mocks/iBTCMock.sol";
 
 contract iBTC_NetworkMiddlewareTest is Test {
     uint256 sepoliaFork;
@@ -133,7 +134,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
             iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         }
         vm.stopPrank();
-
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
         //NOTICE
@@ -182,7 +182,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
         assertTrue(enabledTime > 0, "Enabled time should be greater than 0");
         assertTrue(disabledTime == 0, "Disabled time should be 0");
-
+        console.log("enabledTime", enabledTime);
+        console.log("disabledTime");
         vm.stopPrank();
     }
 
@@ -235,26 +236,50 @@ contract iBTC_NetworkMiddlewareTest is Test {
     }
 
     function testSlashOperator() public {
+        uint256 initialStaking = 1e10;
         testRegisterOperator();
         address operator = address(0x1234);
+
+        vm.prank(IBTC(COLLATTERAL).owner());
+        IBTC(COLLATTERAL).setMinter(address(this));
+
+        IBTC(COLLATTERAL).mint(operator, initialStaking);
+
+        uint256 operatorBalance = IBTC(COLLATTERAL).balanceOf(operator);
+        assertEq(operatorBalance, initialStaking, "Operator should have minted tokens");
+
+        vm.prank(operator);
+        IBTC(COLLATTERAL).approve(vaults[0], initialStaking);
+
         vm.startPrank(OWNER);
+        iBTC_middleware.registerVault(vaults[0]);
+        // iBTC_Vault(vaults[0]).setDelegator(); //
+        vm.stopPrank();
 
         uint48 epoch = iBTC_middleware.getCurrentEpoch();
 
-        vm.startPrank(address(iBTC_middleware));
-        // NOTE figure out how to stake some into it.
+        vm.prank(operator);
+        iBTC_Vault(vaults[0]).deposit(operator, initialStaking);
+
+        assertEq(
+            initialStaking,
+            iBTC_Vault(vaults[0]).activeBalanceOfAt(operator, uint48(block.timestamp), ""),
+            "Initial staking should be done"
+        );
+
+        vm.prank(address(iBTC_middleware));
         iBTC_middleware.calcAndCacheStakes(epoch);
-        vm.stopPrank();
 
         uint256 cachedStake = iBTC_middleware.operatorStakeCache(epoch, operator);
-        assertEq(cachedStake, 0, "Cached stake should match the initial stake");
+        assertEq(cachedStake, initialStaking, "Cached stake should match the initial stake");
 
         uint256 slashAmount = 100;
-        vm.expectRevert();
+
+        vm.startPrank(OWNER);
         iBTC_middleware.slash(epoch, operator, slashAmount);
 
-        // uint256 updatedStake = iBTC_middleware.getOperatorStake(operator, epoch);
-        // assertEq(updatedStake, initialStake - slashAmount, "Stake should be reduced by slashed amount");
+        cachedStake = iBTC_middleware.operatorStakeCache(epoch, operator);
+        assertEq(cachedStake, initialStaking - slashAmount, "Cached stake should be reduced by slash amount");
 
         vm.stopPrank();
     }
