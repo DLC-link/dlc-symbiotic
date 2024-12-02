@@ -196,7 +196,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         operators.remove(operator);
     }
 
-    // NOTICE: WHY we need to register Vautl? should it be network?
     function registerVault(
         address vault
     ) external onlyOwner {
