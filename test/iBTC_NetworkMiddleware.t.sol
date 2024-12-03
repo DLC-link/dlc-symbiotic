@@ -7,6 +7,7 @@ import {NetworkMiddlewareService} from "core/src/contracts/service/NetworkMiddle
 import {NetworkRegistry} from "core/src/contracts/NetworkRegistry.sol";
 import {OperatorRegistry} from "core/src/contracts/OperatorRegistry.sol";
 import {NetworkMiddleware} from "src/iBTC_NetworkMiddleware.sol";
+import {NetworkRestakeDelegator} from "core/src/contracts/delegator/NetworkRestakeDelegator.sol";
 import {OptInService} from "core/src/contracts/service/OptInService.sol";
 import {iBTC_Vault} from "src/iBTC_Vault.sol";
 import {VaultConfigurator} from "src/iBTC_VaultConfigurator.sol";
@@ -53,6 +54,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     BurnerRouter public burner;
     VaultConfigurator public vaultConfigurator;
     iBTC_Vault public iBTC_vault;
+    NetworkRestakeDelegator public network_restake_delegator;
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
@@ -134,6 +136,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
             iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         }
         vm.stopPrank();
+        network_restake_delegator = NetworkRestakeDelegator(delegator_);
+        iBTC_vault = iBTC_Vault(vault_);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
         //NOTICE
@@ -211,7 +215,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
         bool isVaultRegistered = iBTC_middleware.isVaultRegistered(vaults[0]);
         assertTrue(isVaultRegistered, "Vault should be registered");
-
         vm.stopPrank();
     }
 
@@ -219,16 +222,16 @@ contract iBTC_NetworkMiddlewareTest is Test {
         testRegisterVault();
         vm.startPrank(OWNER);
 
-        iBTC_middleware.pauseVault(vaults[0]);
+        iBTC_middleware.pauseVault(address(iBTC_vault));
 
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_middleware.getVaultInfo(vaults[0]);
+        (uint48 enabledTime, uint48 disabledTime) = iBTC_middleware.getVaultInfo(address(iBTC_vault));
         bool isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
 
         assertTrue(isVaultPaused, "Vault should be paused");
 
-        iBTC_middleware.unpauseVault(vaults[0]);
+        iBTC_middleware.unpauseVault(address(iBTC_vault));
 
-        (enabledTime, disabledTime) = iBTC_middleware.getVaultInfo(vaults[0]);
+        (enabledTime, disabledTime) = iBTC_middleware.getVaultInfo(address(iBTC_vault));
         isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
         assertFalse(isVaultPaused, "Vault should be active");
 
@@ -242,18 +245,17 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
         vm.prank(IBTC(COLLATTERAL).owner());
         IBTC(COLLATTERAL).setMinter(address(this));
-
         IBTC(COLLATTERAL).mint(operator, initialStaking);
 
         uint256 operatorBalance = IBTC(COLLATTERAL).balanceOf(operator);
         assertEq(operatorBalance, initialStaking, "Operator should have minted tokens");
 
         vm.prank(operator);
-        IBTC(COLLATTERAL).approve(vaults[0], initialStaking);
+        IBTC(COLLATTERAL).approve(address(iBTC_vault), initialStaking);
 
         vm.startPrank(OWNER);
-        iBTC_middleware.registerVault(vaults[0]);
-        // iBTC_Vault(vaults[0]).setDelegator(); //
+        iBTC_middleware.registerVault(address(iBTC_vault));
+
         vm.stopPrank();
 
         uint48 epoch = iBTC_middleware.getCurrentEpoch();
@@ -266,6 +268,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
             iBTC_Vault(vaults[0]).activeBalanceOfAt(operator, uint48(block.timestamp), ""),
             "Initial staking should be done"
         );
+        // OptIn vault, Network is already optIn
+        vm.prank(operator);
+        vault_optIn_service.optIn(address(iBTC_vault));
 
         vm.prank(address(iBTC_middleware));
         iBTC_middleware.calcAndCacheStakes(epoch);
@@ -288,6 +293,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         testRegisterOperator();
         address operator = address(0x1234);
         vm.prank(operator);
-        vault_optIn_service.optIn(vaults[0]);
+        vault_optIn_service.optIn(address(iBTC_vault));
     }
 }

@@ -24,6 +24,7 @@ contract DeployAll is Script {
     address constant COLLATERAL_ADDRESS = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74; // eth sepolia
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9; // 10 iBTC
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
+    uint256 deployerPrivateKey = uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80); //NOTE
 
     // Replace with the correct checksummed addresses
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4; // Replace with deployed VaultFactory address
@@ -44,6 +45,8 @@ contract DeployAll is Script {
         vm.startBroadcast();
 
         BurnerRouter burner = new BurnerRouter();
+        // Deploy the iBTC_Burner contract
+
         VaultConfigurator vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
 
         // Log the deployed address
