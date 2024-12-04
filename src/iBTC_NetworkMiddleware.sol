@@ -36,6 +36,8 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     error VaultEpochTooShort();
     error VaultGracePeriodNotPassed();
 
+    error InvalidSubnetworksCnt();
+
     error TooOldEpoch();
     error InvalidEpoch();
 
@@ -60,6 +62,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
+    uint256 public subnetworksCnt;
     mapping(uint48 => uint256) public totalStakeCache;
     mapping(uint48 => bool) public totalStakeCached;
     mapping(uint48 => mapping(address => uint256)) public operatorStakeCache;
@@ -96,6 +99,8 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         VAULT_REGISTRY = _vaultRegistry;
         OPERATOR_NET_OPTIN = _operatorNetOptin;
         SLASHING_WINDOW = _slashingWindow;
+
+        subnetworksCnt = 1;
     }
 
     function getEpochStartTs(
@@ -215,13 +220,22 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         vaults.remove(vault);
     }
 
+    function setSubnetworksCnt(
+        uint256 _subnetworksCnt
+    ) external onlyOwner {
+        if (subnetworksCnt >= _subnetworksCnt) {
+            revert InvalidSubnetworksCnt();
+        }
+
+        subnetworksCnt = _subnetworksCnt;
+    }
+
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
         if (totalStakeCached[epoch]) {
             return operatorStakeCache[epoch][operator];
         }
 
         uint48 epochStartTs = getEpochStartTs(epoch);
-        bytes32 networkId = NETWORK.subnetwork(0); // Using library function with identifier 0
 
         for (uint256 i; i < vaults.length(); ++i) {
             (address vault, uint48 enabledTime, uint48 disabledTime) = vaults.atWithTimes(i);
@@ -231,7 +245,11 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
                 continue;
             }
 
-            stake += IBaseDelegator(IVault(vault).delegator()).stakeAt(networkId, operator, epochStartTs, new bytes(0));
+            for (uint96 j = 0; j < subnetworksCnt; ++j) {
+                stake += IBaseDelegator(IVault(vault).delegator()).stakeAt(
+                    NETWORK.subnetwork(j), operator, epochStartTs, new bytes(0)
+                );
+            }
         }
 
         return stake;
@@ -287,7 +305,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
 
     function slash(uint48 epoch, address operator, uint256 amount) public onlyOwner updateStakeCache(epoch) {
         uint48 epochStartTs = getEpochStartTs(epoch);
-        bytes32 networkId = NETWORK.subnetwork(0);
 
         if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
             revert TooOldEpoch();
@@ -307,11 +324,12 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
             if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
                 continue;
             }
-
-            uint256 vaultStake =
-                IBaseDelegator(IVault(vault).delegator()).stakeAt(networkId, operator, epochStartTs, new bytes(0));
-
-            _slashVault(epochStartTs, vault, networkId, operator, (amount * vaultStake) / totalOperatorStake);
+            for (uint96 j = 0; j < subnetworksCnt; ++j) {
+                bytes32 subnetwork = NETWORK.subnetwork(j);
+                uint256 vaultStake =
+                    IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
+                _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
+            }
         }
     }
 
