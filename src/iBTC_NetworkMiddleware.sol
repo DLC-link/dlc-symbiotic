@@ -87,7 +87,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         address _networkRegistry,
         address _vaultRegistry,
         address _operatorNetOptin,
-        address _operatorVaultOptin,
         address _owner,
         uint48 _epochDuration,
         uint48 _slashingWindow
@@ -349,7 +348,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
 
         // simple pro-rata slasher
         for (uint256 i; i < vaults.length(); ++i) {
-            (address vault, uint48 enabledTime, uint48 disabledTime) = operators.atWithTimes(i);
+            (address vault, uint48 enabledTime, uint48 disabledTime) = vaults.atWithTimes(i);
 
             // just skip the vault if it was enabled after the target epoch or not enabled
             if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
