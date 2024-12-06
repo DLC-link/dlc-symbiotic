@@ -212,7 +212,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
             NETWORK_REGISTRY,
             VAULT_FACTORY,
             NEWTORK_OPTIN_SERVICE,
-            VAULT_OPTIN_SERVICE,
             OWNER,
             EPOCH_DURATION,
             SLASHING_WINDOW

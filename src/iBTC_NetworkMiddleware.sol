@@ -87,7 +87,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         address _networkRegistry,
         address _vaultRegistry,
         address _operatorNetOptin,
-        address _operatorVaultOptin,
         address _owner,
         uint48 _epochDuration,
         uint48 _slashingWindow
