@@ -61,7 +61,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // first address network should be a multisig contract
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
-    address constant GLOABAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
+    address constant GLOBAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
 
     uint48 constant EPOCH_DURATION = 7 days;
     // uint48 constant NETWORK_EPOCH = 5 days;
@@ -122,7 +122,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
             owner: OWNER,
             collateral: COLLATTERAL,
             delay: 0, //NOTE we can set a delay
-            globalReceiver: GLOABAL_RECEIVER,
+            globalReceiver: GLOBAL_RECEIVER,
             networkReceivers: networkReceiver,
             operatorNetworkReceivers: operatorNetworkReceiver
         });
