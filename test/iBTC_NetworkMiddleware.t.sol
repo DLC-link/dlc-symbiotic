@@ -16,6 +16,7 @@ import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
 import {MetadataService} from "core/test/service/MetadataService.t.sol";
 import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
+import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
@@ -62,10 +63,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
     address constant GLOBAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
 
-    uint48 constant EPOCH_DURATION = 7 days;
-    // uint48 constant NETWORK_EPOCH = 5 days;
-    uint48 constant SLASHING_WINDOW = 7 days;
-    uint48 vetoDuration = 0 days;
+    /*
+    Rules:
+    1. Vault Epoch Duration should be significantly greater than validatorSetCaptureDelay + Network Epoch + Slashing Window.
+    2. Veto Duration should not be too close to Vault Epoch Duration to prevent delays or high gas costs from hindering slashing execution.
+    3. Provide sufficient buffer time to ensure slashing requests can be executed safely.
+    */
+    uint48 constant VAULT_EPOCH_DURATION = 14 days; // Vault Epoch Duration: Ensures ample time for slashing execution and avoids conflicts.
+    uint48 constant NETWORK_EPOCH = 4 days; // Network Epoch: Defines how frequently the network processes updates or slashing events.
+    uint48 constant SLASHING_WINDOW = 6 days; // Slashing Window: The duration within which slashing requests can be executed.
+    uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
+    uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for executing a slashing request.
+    uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
 
     EnumerableMap.AddressToUintMap operators;
 
@@ -92,6 +101,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
     BaseDelegatorHints baseDelegatorHints;
     NetworkMiddleware networkmiddleware;
     IBTC iBTC;
+    VetoSlasher iBTC_slasher;
+
+    event VetoSlash(uint256 indexed slashIndex, address indexed resolver);
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
@@ -108,7 +120,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint256 depositLimit = 1e10;
         address hook = 0x0000000000000000000000000000000000000000;
         uint64 delegatorIndex = 0;
-        uint64 slasherIndex = 0;
+        uint64 slasherIndex = 1;
         bool withSlasher = true;
         vm.startPrank(OWNER);
 
@@ -137,7 +149,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
             IVault.InitParams({
                 collateral: COLLATTERAL,
                 burner: address(burner),
-                epochDuration: EPOCH_DURATION,
+                epochDuration: VAULT_EPOCH_DURATION,
                 depositWhitelist: depositWhitelist,
                 isDepositLimit: depositLimit != 0,
                 depositLimit: depositLimit,
@@ -213,7 +225,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
             VAULT_FACTORY,
             NEWTORK_OPTIN_SERVICE,
             OWNER,
-            EPOCH_DURATION,
+            NETWORK_EPOCH,
             SLASHING_WINDOW
         );
 
@@ -224,7 +236,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         console.log("Delegator: ", delegator_);
         console.log("Slasher: ", slasher_);
         assertEq(IVault(vault_).slasher(), slasher_);
-
+        iBTC_slasher = VetoSlasher(slasher_);
         vm.startPrank(address(iBTC_networkMiddleware));
         NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
         NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE).setMiddleware(address(iBTC_networkMiddleware));
@@ -297,6 +309,14 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
+    function testOptInVault() public {
+        testRegisterOperator();
+        address operator = address(0x1234);
+        vm.prank(operator);
+        vault_optIn_service.optIn(address(iBTC_vault));
+        assertTrue(vault_optIn_service.isOptedIn(operator, address(iBTC_vault)));
+    }
+
     function testSlashOperator() public {
         bytes32 key = keccak256(abi.encodePacked("alice_key"));
 
@@ -321,6 +341,12 @@ contract iBTC_NetworkMiddlewareTest is Test {
         _optInOperatorNetwork(alice, NETWORK);
 
         assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
+        uint256 slashIndex = 0;
+        _setResolver(0, bob);
+
+        assertEq(iBTC_slasher.resolver(NETWORK.subnetwork(0), ""), bob, "resolver should be setting correctly");
+
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerOperator(alice, key);
         _deposit(alice, depositAmount);
@@ -367,20 +393,57 @@ contract iBTC_NetworkMiddlewareTest is Test {
         );
         assertLt(epochStartTs, Time.timestamp(), "captureTimestamp needs less than Time.timestamp();");
 
-        vm.prank(OWNER);
+        // test slash using VetoSlasher
+
+        vm.startPrank(OWNER);
         iBTC_networkMiddleware.slash(epoch, alice, slashAmount);
+        // it's stiil veto duration
+        vm.expectRevert();
+        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
+        vm.warp(Time.timestamp() + 2 days);
+        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
+        vm.stopPrank();
         uint256 amountAfterSlashed = iBTC_vault.activeBalanceOf(alice);
         assertEq(amountAfterSlashed, depositAmount - slashAmount, "Cached stake should be reduced by slash amount");
 
-        vm.stopPrank();
+        // vm.expectEmit(true, true, false, false);
+        // emit VetoSlash(slashIndex, resolver);
+        // (
+        //     bytes32 subnetwork,
+        //     address operator,
+        //     uint256 amount,
+        //     uint48 captureTimestamp,
+        //     uint48 vetoDeadline,
+        //     bool completed
+        // ) = iBTC_slasher.slashRequests(0);
+        // console.logBytes32(subnetwork);
+        // vm.assertEq(subnetwork, NETWORK.subnetwork(0));
+        // console.log("Operator:", operator);
+        // console.log("Amount:", amount);
+        // console.log("Capture Timestamp:", captureTimestamp);
+        // vm.assertLe(captureTimestamp, Time.timestamp() - 2 days);
+        // console.log("Veto Deadline:", vetoDeadline);
+        // console.log("Completed:", completed);
+        // address captureResolver =
+        //     iBTC_slasher.resolverAt(subnetwork, captureTimestamp,"");
+        // console.log("captureResolver",captureResolver );
+
+        // test veto slash
+        vm.prank(OWNER);
+        iBTC_networkMiddleware.slash(epoch, alice, slashAmount);
+        vm.prank(bob);
+        iBTC_slasher.vetoSlash(slashIndex + 1, "");
+        uint256 amountAfterVetoSlashed = iBTC_vault.activeBalanceOf(alice);
+        assertEq(amountAfterVetoSlashed, amountAfterSlashed, "Cached stake should stay the same");
+
+        vm.expectRevert();
+        vm.prank(OWNER);
+        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
     }
 
-    function testOptInVault() public {
-        testRegisterOperator();
-        address operator = address(0x1234);
-        vm.prank(operator);
-        vault_optIn_service.optIn(address(iBTC_vault));
-        assertTrue(vault_optIn_service.isOptedIn(operator, address(iBTC_vault)));
+    function _setResolver(uint96 identifier, address resolver) internal {
+        vm.prank(NETWORK);
+        iBTC_slasher.setResolver(identifier, resolver, "");
     }
 
     function _setMaxNetworkLimit(address user, uint96 identifier, uint256 amount) internal {
