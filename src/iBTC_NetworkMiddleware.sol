@@ -45,6 +45,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     error SlashingWindowTooShort();
     error TooBigSlashAmount();
     error UnknownSlasherType();
+    error NotVetoSlasher();
 
     struct ValidatorData {
         uint256 stake;
@@ -361,6 +362,19 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
                 _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
             }
         }
+    }
+
+    function executeSlash(
+        uint256 slashIndex,
+        address vault,
+        bytes calldata hints
+    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+        address slasher = IVault(vault).slasher();
+        uint256 slasherType = IEntity(slasher).TYPE();
+        if (slasherType != VETO_SLASHER_TYPE) {
+            revert NotVetoSlasher();
+        }
+        IVetoSlasher(slasher).executeSlash(slashIndex, hints);
     }
 
     function calcAndCacheStakes(

@@ -26,7 +26,7 @@ contract DeployAll is Script {
     address constant COLLATERAL_ADDRESS = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74; // eth sepolia
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9; // 10 iBTC
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
-    address constant GLOABAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
+    address constant GLOBAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
 
     // Replace with the correct checksummed addresses
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4; // Replace with deployed VaultFactory address
@@ -52,7 +52,7 @@ contract DeployAll is Script {
             owner: owner,
             collateral: collateral,
             delay: 0, //NOTE we can set a delay
-            globalReceiver: GLOABAL_RECEIVER,
+            globalReceiver: GLOBAL_RECEIVER,
             networkReceivers: networkReceiver,
             operatorNetworkReceivers: operatorNetworkReceiver
         });
