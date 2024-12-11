@@ -245,81 +245,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function testRegisterOperator() public {
-        address operator = address(0x1234);
-        bytes32 key = keccak256(abi.encodePacked("operator_key"));
-        vm.startPrank(operator);
-        OperatorRegistry(OPERATOR_REGISTRY).registerOperator();
-        network_optIn_service.optIn(NETWORK);
-        vm.stopPrank();
-        vm.startPrank(OWNER);
-        iBTC_networkMiddleware.registerOperator(operator, key);
-
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(operator);
-
-        assertTrue(enabledTime > 0, "Enabled time should be greater than 0");
-        assertTrue(disabledTime == 0, "Disabled time should be 0");
-        console.log("enabledTime", enabledTime);
-        console.log("disabledTime");
-        vm.stopPrank();
-    }
-
-    function testUnregisterOperator() public {
-        testRegisterOperator();
-        address operator = address(0x1234);
-
-        vm.startPrank(OWNER);
-
-        iBTC_networkMiddleware.pauseOperator(operator);
-
-        vm.warp(block.timestamp + SLASHING_WINDOW + 1);
-        iBTC_networkMiddleware.unregisterOperator(operator);
-
-        bool isOperatorRegistered = iBTC_networkMiddleware.isOperatorRegistered(operator);
-        assertFalse(isOperatorRegistered, "Operator should be unregistered");
-
-        vm.stopPrank();
-    }
-
-    function testRegisterVault() public {
-        vm.startPrank(OWNER);
-
-        iBTC_networkMiddleware.registerVault(vaults[0]);
-
-        bool isVaultRegistered = iBTC_networkMiddleware.isVaultRegistered(vaults[0]);
-        assertTrue(isVaultRegistered, "Vault should be registered");
-        vm.stopPrank();
-    }
-
-    function testPauseAndUnpauseVault() public {
-        testRegisterVault();
-        vm.startPrank(OWNER);
-
-        iBTC_networkMiddleware.pauseVault(address(iBTC_vault));
-
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getVaultInfo(address(iBTC_vault));
-        bool isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
-
-        assertTrue(isVaultPaused, "Vault should be paused");
-
-        iBTC_networkMiddleware.unpauseVault(address(iBTC_vault));
-
-        (enabledTime, disabledTime) = iBTC_networkMiddleware.getVaultInfo(address(iBTC_vault));
-        isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
-        assertFalse(isVaultPaused, "Vault should be active");
-
-        vm.stopPrank();
-    }
-
-    function testOptInVault() public {
-        testRegisterOperator();
-        address operator = address(0x1234);
-        vm.prank(operator);
-        vault_optIn_service.optIn(address(iBTC_vault));
-        assertTrue(vault_optIn_service.isOptedIn(operator, address(iBTC_vault)));
-    }
-
-    function testSlashOperator() public {
+    function testRedistributeTokens() public {
         bytes32 key = keccak256(abi.encodePacked("alice_key"));
 
         uint256 depositAmount = 1e10;
@@ -408,39 +334,12 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint256 amountAfterSlashed = iBTC_vault.activeBalanceOf(alice);
         assertEq(amountAfterSlashed, depositAmount - slashAmount, "Cached stake should be reduced by slash amount");
 
-        // vm.expectEmit(true, true, false, false);
-        // emit VetoSlash(slashIndex, resolver);
-        // (
-        //     bytes32 subnetwork,
-        //     address operator,
-        //     uint256 amount,
-        //     uint48 captureTimestamp,
-        //     uint48 vetoDeadline,
-        //     bool completed
-        // ) = iBTC_slasher.slashRequests(0);
-        // console.logBytes32(subnetwork);
-        // vm.assertEq(subnetwork, NETWORK.subnetwork(0));
-        // console.log("Operator:", operator);
-        // console.log("Amount:", amount);
-        // console.log("Capture Timestamp:", captureTimestamp);
-        // vm.assertLe(captureTimestamp, Time.timestamp() - 2 days);
-        // console.log("Veto Deadline:", vetoDeadline);
-        // console.log("Completed:", completed);
-        // address captureResolver =
-        //     iBTC_slasher.resolverAt(subnetwork, captureTimestamp,"");
-        // console.log("captureResolver",captureResolver );
+        burner.triggerTransfer(address(iBTC_globalReceiver));
+        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
 
-        // test veto slash
         vm.prank(OWNER);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount);
-        vm.prank(bob);
-        iBTC_slasher.vetoSlash(slashIndex + 1, "");
-        uint256 amountAfterVetoSlashed = iBTC_vault.activeBalanceOf(alice);
-        assertEq(amountAfterVetoSlashed, amountAfterSlashed, "Cached stake should stay the same");
-
-        vm.expectRevert();
-        vm.prank(OWNER);
-        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
+        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
+        assertEq(iBTC.balanceOf(bob), slashAmount);
     }
 
     function _setResolver(uint96 identifier, address resolver) internal {
