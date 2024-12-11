@@ -16,10 +16,11 @@ import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
+import {MultisigValidated} from "./libraries/MultisigValidated.sol";
 import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 
-contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
+contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;
@@ -90,8 +91,10 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         address _operatorNetOptin,
         address _owner,
         uint48 _epochDuration,
-        uint48 _slashingWindow
-    ) SimpleKeyRegistry32() Ownable(_owner) {
+        uint48 _slashingWindow,
+        uint16 _threshold,
+        uint16 _minimumThreshold
+    ) SimpleKeyRegistry32() MultisigValidated(_owner, _minimumThreshold, _threshold) {
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
@@ -334,7 +337,12 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         // process payload
     }
 
-    function slash(uint48 epoch, address operator, uint256 amount) public onlyOwner updateStakeCache(epoch) {
+    function slash(
+        uint48 epoch,
+        address operator,
+        uint256 amount,
+        bytes[] calldata signatures
+    ) public onlyMultisig(abi.encode(epoch, operator, amount), signatures) updateStakeCache(epoch) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
