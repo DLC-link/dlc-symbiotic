@@ -443,6 +443,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
         iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
     }
 
+    function testGlobalReceiver() public {
+        uint256 slashAmount = 1e9;
+        testSlashOperator();
+
+        burner.triggerTransfer(address(iBTC_globalReceiver));
+        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
+
+        vm.prank(OWNER);
+        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
+        assertEq(iBTC.balanceOf(bob), slashAmount);
+    }
+
     function _setResolver(uint96 identifier, address resolver) internal {
         vm.prank(NETWORK);
         iBTC_slasher.setResolver(identifier, resolver, "");
