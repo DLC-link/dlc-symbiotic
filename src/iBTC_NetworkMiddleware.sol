@@ -53,6 +53,13 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         bytes32 key;
     }
 
+    struct SlashedInfo {
+        uint48 epoch;
+        address operator;
+        uint256 slashedAmount;
+        uint256 timeStamp;
+    }
+
     address public immutable NETWORK;
     address public immutable OPERATOR_REGISTRY;
     address public immutable NETWORK_REGISTRY;
@@ -67,7 +74,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
+    uint256 public slashIndex;
     uint256 public subnetworksCnt;
+    mapping(uint256 slashIndex => SlashedInfo) slashedInfos;
     mapping(uint48 => uint256) public totalStakeCache;
     mapping(uint48 => bool) public totalStakeCached;
     mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
@@ -342,7 +351,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         address operator,
         uint256 amount,
         bytes[] calldata signatures
-    ) public onlyMultisig(abi.encode(epoch, operator, amount), signatures) updateStakeCache(epoch) {
+    ) public onlyMultisig(abi.encode(slashIndex, epoch, operator, amount), signatures) updateStakeCache(epoch) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
@@ -368,12 +377,14 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
                 uint256 vaultStake =
                     IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
                 _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
+                slashedInfos[slashIndex++] =
+                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
             }
         }
     }
 
     function executeSlash(
-        uint256 slashIndex,
+        uint256 slashIndex_,
         address vault,
         bytes calldata hints
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
@@ -382,7 +393,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         if (slasherType != VETO_SLASHER_TYPE) {
             revert NotVetoSlasher();
         }
-        IVetoSlasher(slasher).executeSlash(slashIndex, hints);
+        IVetoSlasher(slasher).executeSlash(slashIndex_, hints);
     }
 
     function calcAndCacheStakes(
