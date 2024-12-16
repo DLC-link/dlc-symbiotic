@@ -16,10 +16,11 @@ import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
+import {MultisigValidated} from "./libraries/MultisigValidated.sol";
 import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 
-contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
+contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using Subnetwork for address;
@@ -52,6 +53,13 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         bytes32 key;
     }
 
+    struct SlashedInfo {
+        uint48 epoch;
+        address operator;
+        uint256 slashedAmount;
+        uint256 timeStamp;
+    }
+
     address public immutable NETWORK;
     address public immutable OPERATOR_REGISTRY;
     address public immutable NETWORK_REGISTRY;
@@ -66,7 +74,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
+    uint256 public slashIndex;
     uint256 public subnetworksCnt;
+    mapping(uint256 slashIndex => SlashedInfo) slashedInfos;
     mapping(uint48 => uint256) public totalStakeCache;
     mapping(uint48 => bool) public totalStakeCached;
     mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
@@ -90,8 +100,10 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         address _operatorNetOptin,
         address _owner,
         uint48 _epochDuration,
-        uint48 _slashingWindow
-    ) SimpleKeyRegistry32() Ownable(_owner) {
+        uint48 _slashingWindow,
+        uint16 _threshold,
+        uint16 _minimumThreshold
+    ) SimpleKeyRegistry32() MultisigValidated(_owner, _minimumThreshold, _threshold) {
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
@@ -334,7 +346,12 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         // process payload
     }
 
-    function slash(uint48 epoch, address operator, uint256 amount) public onlyOwner updateStakeCache(epoch) {
+    function slash(
+        uint48 epoch,
+        address operator,
+        uint256 amount,
+        bytes[] calldata signatures
+    ) public onlyMultisig(abi.encode(slashIndex, epoch, operator, amount), signatures) updateStakeCache(epoch) {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
@@ -360,12 +377,14 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
                 uint256 vaultStake =
                     IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
                 _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
+                slashedInfos[slashIndex++] =
+                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
             }
         }
     }
 
     function executeSlash(
-        uint256 slashIndex,
+        uint256 slashIndex_,
         address vault,
         bytes calldata hints
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
@@ -374,7 +393,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable {
         if (slasherType != VETO_SLASHER_TYPE) {
             revert NotVetoSlasher();
         }
-        IVetoSlasher(slasher).executeSlash(slashIndex, hints);
+        IVetoSlasher(slasher).executeSlash(slashIndex_, hints);
     }
 
     function calcAndCacheStakes(

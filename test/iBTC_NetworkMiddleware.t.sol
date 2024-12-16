@@ -42,6 +42,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     uint256 sepoliaFork;
     string SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
+
     address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
     address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
@@ -56,6 +57,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9;
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
 
+    bytes32 public constant APPROVED_SIGNER = keccak256("APPROVED_SIGNER");
     bytes32 public constant NETWORK_LIMIT_SET_ROLE = keccak256("NETWORK_LIMIT_SET_ROLE");
     bytes32 public constant OPERATOR_NETWORK_SHARES_SET_ROLE = keccak256("OPERATOR_NETWORK_SHARES_SET_ROLE");
 
@@ -86,6 +88,11 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address bob;
     uint256 bobPrivateKey;
 
+    address approvedSigner1;
+    uint256 approvedSigner1Key;
+    address approvedSigner2;
+    uint256 approvedSigner2Key;
+
     OptInService network_optIn_service;
     OptInService vault_optIn_service;
     NetworkMiddleware public iBTC_networkMiddleware;
@@ -109,6 +116,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
         (alice, alicePrivateKey) = makeAddrAndKey("alice");
         (bob, bobPrivateKey) = makeAddrAndKey("bob");
+        (approvedSigner1, approvedSigner1Key) = makeAddrAndKey("approvedSigner1");
+        (approvedSigner2, approvedSigner2Key) = makeAddrAndKey("approvedSigner2");
         networkRegistry = NetworkRegistry(NETWORK_REGISTRY);
         networkMiddlewareService = NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE);
         operatorRegistry = OperatorRegistry(OPERATOR_REGISTRY);
@@ -122,6 +131,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint64 delegatorIndex = 0;
         uint64 slasherIndex = 1;
         bool withSlasher = true;
+        uint16 threshold = 2; // for test case
+        uint16 minimumThreshold = 2;
         vm.startPrank(OWNER);
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
@@ -226,7 +237,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
             NEWTORK_OPTIN_SERVICE,
             OWNER,
             NETWORK_EPOCH,
-            SLASHING_WINDOW
+            SLASHING_WINDOW,
+            threshold,
+            minimumThreshold
         );
 
         vm.stopPrank();
@@ -319,12 +332,12 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     function testSlashOperator() public {
         bytes32 key = keccak256(abi.encodePacked("alice_key"));
-
         uint256 depositAmount = 1e10;
         uint256 blockTimestamp = block.timestamp * block.timestamp / block.timestamp * block.timestamp / block.timestamp;
         blockTimestamp = blockTimestamp + 1_720_700_948;
         uint256 networkLimit = 1e10;
         uint256 operatorNetworkShares1 = 1e10;
+
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerVault(address(iBTC_vault));
 
@@ -342,7 +355,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
         assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
 
-        uint256 slashIndex = 0;
         _setResolver(0, bob);
 
         assertEq(iBTC_slasher.resolver(NETWORK.subnetwork(0), ""), bob, "resolver should be setting correctly");
@@ -350,7 +362,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerOperator(alice, key);
         _deposit(alice, depositAmount);
-        // _withdraw(alice, withdrawAmount);
         assertEq(
             depositAmount, iBTC_vault.activeBalanceOfAt(alice, uint48(block.timestamp), ""), "Deposit should be done"
         );
@@ -383,8 +394,10 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
         uint256 cachedStake = iBTC_networkMiddleware.calcAndCacheStakes(epoch);
         assertEq(cachedStake, operatorNetworkShares1, "cache should update");
+
         uint256 slashAmount = 1e9;
         vm.warp(Time.timestamp() + 1 days);
+
         uint48 epochStartTs = iBTC_networkMiddleware.getEpochStartTs(epoch);
         assertGe(
             epochStartTs,
@@ -393,52 +406,73 @@ contract iBTC_NetworkMiddlewareTest is Test {
         );
         assertLt(epochStartTs, Time.timestamp(), "captureTimestamp needs less than Time.timestamp();");
 
-        // test slash using VetoSlasher
-
+        // **generate Signature**
         vm.startPrank(OWNER);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount);
-        // it's stiil veto duration
+        iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner1);
+        assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner1));
+        iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner2);
+        assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner2));
+
+        vm.stopPrank();
+        uint256[] memory approvedSignerKeys = new uint256[](2);
+        approvedSignerKeys[0] = approvedSigner1Key;
+        approvedSignerKeys[1] = approvedSigner2Key;
+        uint256 slashIndex = 0;
+
+        bytes[] memory signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
+        // **call slash*
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
+
+        // **excute slash**
         vm.expectRevert();
         iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
         vm.warp(Time.timestamp() + 2 days);
         iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
         vm.stopPrank();
+
         uint256 amountAfterSlashed = iBTC_vault.activeBalanceOf(alice);
         assertEq(amountAfterSlashed, depositAmount - slashAmount, "Cached stake should be reduced by slash amount");
 
-        // vm.expectEmit(true, true, false, false);
-        // emit VetoSlash(slashIndex, resolver);
-        // (
-        //     bytes32 subnetwork,
-        //     address operator,
-        //     uint256 amount,
-        //     uint48 captureTimestamp,
-        //     uint48 vetoDeadline,
-        //     bool completed
-        // ) = iBTC_slasher.slashRequests(0);
-        // console.logBytes32(subnetwork);
-        // vm.assertEq(subnetwork, NETWORK.subnetwork(0));
-        // console.log("Operator:", operator);
-        // console.log("Amount:", amount);
-        // console.log("Capture Timestamp:", captureTimestamp);
-        // vm.assertLe(captureTimestamp, Time.timestamp() - 2 days);
-        // console.log("Veto Deadline:", vetoDeadline);
-        // console.log("Completed:", completed);
-        // address captureResolver =
-        //     iBTC_slasher.resolverAt(subnetwork, captureTimestamp,"");
-        // console.log("captureResolver",captureResolver );
-
-        // test veto slash
+        // **testing veto slash**
         vm.prank(OWNER);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount);
+        slashIndex++;
+        signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
+        iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
         vm.prank(bob);
-        iBTC_slasher.vetoSlash(slashIndex + 1, "");
+        iBTC_slasher.vetoSlash(slashIndex, "");
+
         uint256 amountAfterVetoSlashed = iBTC_vault.activeBalanceOf(alice);
         assertEq(amountAfterVetoSlashed, amountAfterSlashed, "Cached stake should stay the same");
 
         vm.expectRevert();
         vm.prank(OWNER);
-        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
+        iBTC_networkMiddleware.executeSlash(slashIndex, address(iBTC_vault), "");
+    }
+
+    function _makeSignatures(
+        uint256 slashIndex,
+        uint48 epoch,
+        address operator,
+        uint256 slashAmount,
+        uint256[] memory approvedSignerKeys
+    ) internal returns (bytes[] memory signatures) {
+        bytes memory dataToSign = abi.encode(slashIndex, epoch, operator, slashAmount);
+        bytes32 messageHash = keccak256(dataToSign);
+
+        signatures = new bytes[](approvedSignerKeys.length);
+
+        for (uint256 i = 0; i < approvedSignerKeys.length; i++) {
+            signatures[i] = _signMessage(approvedSignerKeys[i], messageHash);
+        }
+
+        return signatures;
+    }
+
+    function _signMessage(uint256 signerPrivateKey, bytes32 messageHash) internal returns (bytes memory) {
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, ethSignedMessageHash);
+        return abi.encodePacked(r, s, v);
     }
 
     function _setResolver(uint96 identifier, address resolver) internal {
