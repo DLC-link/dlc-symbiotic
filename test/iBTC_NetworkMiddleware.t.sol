@@ -400,6 +400,14 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint256 slashAmount = 1e9;
         vm.warp(Time.timestamp() + 1 days);
 
+        uint48 epochStartTs = iBTC_networkMiddleware.getEpochStartTs(epoch);
+        assertGe(
+            epochStartTs,
+            Time.timestamp() - iBTC_vault.epochDuration(),
+            "captureTimesstamp needs greater and equal that Time.timestamp()-iBTC_vault.epochDuration()"
+        );
+        assertLt(epochStartTs, Time.timestamp(), "captureTimestamp needs less than Time.timestamp();");
+
         // **generate Signature**
         vm.startPrank(OWNER);
         iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner1);
