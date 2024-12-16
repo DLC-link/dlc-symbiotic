@@ -335,33 +335,64 @@ contract iBTC_NetworkMiddlewareTest is Test {
     function testSlashOperator() public {
         bytes32 key = keccak256(abi.encodePacked("alice_key"));
         uint256 depositAmount = 1e10;
+        uint256 blockTimestamp = block.timestamp * block.timestamp / block.timestamp * block.timestamp / block.timestamp;
+        blockTimestamp = blockTimestamp + 1_720_700_948;
         uint256 networkLimit = 1e10;
         uint256 operatorNetworkShares1 = 1e10;
 
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerVault(address(iBTC_vault));
 
+        assertEq(iBTC_vault.delegator(), address(iBTC_delegator), "delegator should be right.");
         _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
         _registerOperator(alice);
 
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
         _optInOperatorVault(alice);
+
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
         _optInOperatorNetwork(alice, NETWORK);
 
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
         _setResolver(0, bob);
+
+        assertEq(iBTC_slasher.resolver(NETWORK.subnetwork(0), ""), bob, "resolver should be setting correctly");
 
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerOperator(alice, key);
         _deposit(alice, depositAmount);
+        assertEq(
+            depositAmount, iBTC_vault.activeBalanceOfAt(alice, uint48(block.timestamp), ""), "Deposit should be done"
+        );
+
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
 
         vm.prank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         _setNetworkLimit(alice, NETWORK, networkLimit);
 
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
         vm.prank(OWNER);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
         _setOperatorNetworkShares(alice, NETWORK, alice, operatorNetworkShares1);
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), operatorNetworkShares1);
+
+        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(alice);
+        console.log("enabledTime", enabledTime);
+        console.log("disabledTime", disabledTime);
+        uint256 stakeAt = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(enabledTime), "");
+        assertEq(stakeAt, operatorNetworkShares1, "StakeAt should stand the same");
 
         uint48 epoch = iBTC_networkMiddleware.getCurrentEpoch();
+        assertEq(
+            iBTC_networkMiddleware.getOperatorStake(alice, epoch),
+            iBTC_delegator.stake(NETWORK.subnetwork(0), alice),
+            "stake should be the same"
+        );
 
         uint256 cachedStake = iBTC_networkMiddleware.calcAndCacheStakes(epoch);
         assertEq(cachedStake, operatorNetworkShares1, "cache should update");
