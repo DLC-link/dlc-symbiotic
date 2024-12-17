@@ -452,6 +452,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
         iBTC_networkMiddleware.executeSlash(slashIndex, address(iBTC_vault), "");
     }
 
+    function testGlobalReceiver() public {
+        uint256 slashAmount = 1e9;
+        testSlashOperator();
+
+        burner.triggerTransfer(address(iBTC_globalReceiver));
+        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
+
+        vm.prank(OWNER);
+        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
+        assertEq(iBTC.balanceOf(bob), slashAmount);
+    }
+
     function _makeSignatures(
         uint256 slashIndex,
         uint48 epoch,
@@ -475,18 +487,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, ethSignedMessageHash);
         return abi.encodePacked(r, s, v);
-    }
-
-    function testGlobalReceiver() public {
-        uint256 slashAmount = 1e9;
-        testSlashOperator();
-
-        burner.triggerTransfer(address(iBTC_globalReceiver));
-        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
-
-        vm.prank(OWNER);
-        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
-        assertEq(iBTC.balanceOf(bob), slashAmount);
     }
 
     function _setResolver(uint96 identifier, address resolver) internal {
