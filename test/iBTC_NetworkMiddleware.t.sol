@@ -17,6 +17,7 @@ import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFact
 import {MetadataService} from "core/test/service/MetadataService.t.sol";
 import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
+import {iBTC_GlobalReceiver} from "src/iBTC_GlobalReceiver.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
@@ -46,7 +47,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
     address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
-    address constant COLLATTERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
+    address constant COLLATERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4;
     address constant DELEGATOR_FACTORY = 0x890CA3f95E0f40a79885B7400926544B2214B03f;
     address constant SLASHER_FACTORY = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
@@ -63,7 +64,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // first address network should be a multisig contract
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
-    address constant GLOBAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
 
     /*
     Rules:
@@ -109,6 +109,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     NetworkMiddleware networkmiddleware;
     IBTC iBTC;
     VetoSlasher iBTC_slasher;
+    iBTC_GlobalReceiver iBTC_globalReceiver;
 
     event VetoSlash(uint256 indexed slashIndex, address indexed resolver);
 
@@ -121,7 +122,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         networkRegistry = NetworkRegistry(NETWORK_REGISTRY);
         networkMiddlewareService = NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE);
         operatorRegistry = OperatorRegistry(OPERATOR_REGISTRY);
-        iBTC = IBTC(COLLATTERAL);
+        iBTC = IBTC(COLLATERAL);
         operatorMetadataService = new MetadataService(OPERATOR_METADATA_SERVICE);
         networkMetadataService = new MetadataService(NETWORK_METADATA_SERVICE);
         address[] memory whitelistedDepositors;
@@ -136,14 +137,15 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
-
+        iBTC_globalReceiver = new iBTC_GlobalReceiver();
+        iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
         IBurnerRouter.NetworkReceiver[] memory networkReceiver;
         IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceiver;
         IBurnerRouter.InitParams memory params = IBurnerRouter.InitParams({
             owner: OWNER,
-            collateral: COLLATTERAL,
+            collateral: COLLATERAL,
             delay: 0, //NOTE we can set a delay
-            globalReceiver: GLOBAL_RECEIVER,
+            globalReceiver: address(iBTC_globalReceiver),
             networkReceivers: networkReceiver,
             operatorNetworkReceivers: operatorNetworkReceiver
         });
@@ -151,14 +153,14 @@ contract iBTC_NetworkMiddlewareTest is Test {
         BurnerRouterFactory burnerRouterFactory = new BurnerRouterFactory(address(burnerTemplate));
         address burnerAddress = address(burnerRouterFactory.create(params));
         burner = BurnerRouter(burnerAddress);
-        assertEq(burner.collateral(), COLLATTERAL, "Burner Router should be setting correctly");
+        assertEq(burner.collateral(), COLLATERAL, "Burner Router should be setting correctly");
         (,, address deployer) = vm.readCallers();
 
         bool depositWhitelist = whitelistedDepositors.length != 0;
 
         bytes memory vaultParams = abi.encode(
             IVault.InitParams({
-                collateral: COLLATTERAL,
+                collateral: COLLATERAL,
                 burner: address(burner),
                 epochDuration: VAULT_EPOCH_DURATION,
                 depositWhitelist: depositWhitelist,
@@ -223,9 +225,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         iBTC_vault = iBTC_Vault(vault_);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
-        //NOTICE
-        // vm.prank(vault_);
-        // NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
 
         vaults.push(vault_);
         vm.startPrank(OWNER);
@@ -448,6 +447,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.expectRevert();
         vm.prank(OWNER);
         iBTC_networkMiddleware.executeSlash(slashIndex, address(iBTC_vault), "");
+    }
+
+    function testGlobalReceiver() public {
+        uint256 slashAmount = 1e9;
+        testSlashOperator();
+
+        burner.triggerTransfer(address(iBTC_globalReceiver));
+        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
+
+        vm.prank(OWNER);
+        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
+        assertEq(iBTC.balanceOf(bob), slashAmount);
     }
 
     function _makeSignatures(

@@ -340,12 +340,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         }
     }
 
-    function submission(bytes memory payload, bytes32[] memory signatures) public updateStakeCache(getCurrentEpoch()) {
-        // validate signatures
-        // validate payload
-        // process payload
-    }
-
     function slash(
         uint48 epoch,
         address operator,
