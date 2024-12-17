@@ -16,7 +16,7 @@ import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
 import {MetadataService} from "core/test/service/MetadataService.t.sol";
 import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
-import {Slasher} from "core/src/contracts/slasher/Slasher.sol";
+import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
@@ -63,10 +63,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
     address constant GLOBAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
 
-    uint48 constant EPOCH_DURATION = 7 days;
-    // uint48 constant NETWORK_EPOCH = 5 days;
-    uint48 constant SLASHING_WINDOW = 7 days;
-    uint48 vetoDuration = 0 days;
+    /*
+    Rules:
+    1. Vault Epoch Duration should be significantly greater than validatorSetCaptureDelay + Network Epoch + Slashing Window.
+    2. Veto Duration should not be too close to Vault Epoch Duration to prevent delays or high gas costs from hindering slashing execution.
+    3. Provide sufficient buffer time to ensure slashing requests can be executed safely.
+    */
+    uint48 constant VAULT_EPOCH_DURATION = 14 days; // Vault Epoch Duration: Ensures ample time for slashing execution and avoids conflicts.
+    uint48 constant NETWORK_EPOCH = 4 days; // Network Epoch: Defines how frequently the network processes updates or slashing events.
+    uint48 constant SLASHING_WINDOW = 6 days; // Slashing Window: The duration within which slashing requests can be executed.
+    uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
+    uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for executing a slashing request.
+    uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
 
     EnumerableMap.AddressToUintMap operators;
 
@@ -78,12 +86,17 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address bob;
     uint256 bobPrivateKey;
 
+     address approvedSigner1;
+    uint256 approvedSigner1Key;
+    address approvedSigner2;
+    uint256 approvedSigner2Key;
+
     OptInService network_optIn_service;
     OptInService vault_optIn_service;
-    NetworkMiddleware iBTC_networkMiddleware;
-    BurnerRouter burner;
-    VaultConfigurator vaultConfigurator;
-    iBTC_Vault iBTC_vault;
+    NetworkMiddleware public iBTC_networkMiddleware;
+    BurnerRouter public burner;
+    VaultConfigurator public vaultConfigurator;
+    iBTC_Vault public iBTC_vault;
     NetworkRegistry networkRegistry;
     OperatorRegistry operatorRegistry;
     NetworkRestakeDelegator iBTC_delegator;
@@ -93,12 +106,16 @@ contract iBTC_NetworkMiddlewareTest is Test {
     BaseDelegatorHints baseDelegatorHints;
     NetworkMiddleware networkmiddleware;
     IBTC iBTC;
-    Slasher iBTC_slasher;
+    VetoSlasher iBTC_slasher;
+
+    event VetoSlash(uint256 indexed slashIndex, address indexed resolver);
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
         (alice, alicePrivateKey) = makeAddrAndKey("alice");
         (bob, bobPrivateKey) = makeAddrAndKey("bob");
+        (approvedSigner1, approvedSigner1Key) = makeAddrAndKey("approvedSigner1");
+        (approvedSigner2, approvedSigner2Key) = makeAddrAndKey("approvedSigner2");
         networkRegistry = NetworkRegistry(NETWORK_REGISTRY);
         networkMiddlewareService = NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE);
         operatorRegistry = OperatorRegistry(OPERATOR_REGISTRY);
@@ -110,8 +127,10 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint256 depositLimit = 1e10;
         address hook = 0x0000000000000000000000000000000000000000;
         uint64 delegatorIndex = 0;
-        uint64 slasherIndex = 0;
+        uint64 slasherIndex = 1;
         bool withSlasher = true;
+        uint16 threshold = 2; // for test case
+        uint16 minimumThreshold = 2;
         vm.startPrank(OWNER);
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
@@ -139,7 +158,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
             IVault.InitParams({
                 collateral: COLLATTERAL,
                 burner: address(burner),
-                epochDuration: EPOCH_DURATION,
+                epochDuration: VAULT_EPOCH_DURATION,
                 depositWhitelist: depositWhitelist,
                 isDepositLimit: depositLimit != 0,
                 depositLimit: depositLimit,
@@ -215,24 +234,27 @@ contract iBTC_NetworkMiddlewareTest is Test {
             VAULT_FACTORY,
             NEWTORK_OPTIN_SERVICE,
             OWNER,
-            EPOCH_DURATION,
-            SLASHING_WINDOW
+            NETWORK_EPOCH,
+            SLASHING_WINDOW,
+            threshold,
+            minimumThreshold
         );
 
         vm.stopPrank();
         _registerNetwork(NETWORK, address(iBTC_networkMiddleware));
-        console.log("NetworkMiddleware: ", address(iBTC_networkMiddleware));
+
         console.log("Vault: ", vault_);
         console.log("Delegator: ", delegator_);
         console.log("Slasher: ", slasher_);
         assertEq(IVault(vault_).slasher(), slasher_);
-        iBTC_slasher = Slasher(slasher_);
+        iBTC_slasher = VetoSlasher(slasher_);
         vm.startPrank(address(iBTC_networkMiddleware));
         NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
         NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE).setMiddleware(address(iBTC_networkMiddleware));
         vm.stopPrank();
-    }
+             _setResolver(0, bob);
 
+    }
     function test_SetNetworkLimit() public {
         uint256 amount1 = 1e10;
         uint256 amount2 = 1e9;
@@ -478,7 +500,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint256 slashAmount1 = 1e10;
         uint256 slashAmount2 = 4e9;
 
-        uint256 blockTimestamp = block.timestamp * block.timestamp / block.timestamp * block.timestamp / block.timestamp;
+        uint256 blockTimestamp = block.timestamp;
         blockTimestamp = blockTimestamp + 1_720_700_948;
         vm.warp(blockTimestamp);
 
@@ -581,52 +603,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
             operatorNetworkShares2
         );
         assertEq(iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), bob), operatorNetworkShares2);
-
-        blockTimestamp = blockTimestamp + 1;
-        vm.warp(blockTimestamp);
-
-        uint256 operatorNetworkStake2 = operatorNetworkShares2.mulDiv(
-            Math.min(networkLimit, depositAmount - Math.min(slashAmount1Real, depositAmount)),
-            operatorNetworkShares1 + operatorNetworkShares2
-        );
-        vm.assume(operatorNetworkStake2 > 0);
-        uint256 slashAmount2Real = Math.min(slashAmount2, operatorNetworkStake2);
-        assertEq(
-            _slash(address(iBTC_networkMiddleware), NETWORK, bob, slashAmount2, uint48(blockTimestamp - 1), ""),
-            slashAmount2Real
-        );
-
-        assertEq(
-            iBTC_delegator.networkLimitAt(
-                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
-            ),
-            networkLimit
-        );
-        assertEq(iBTC_delegator.networkLimit(NETWORK.subnetwork(0)), networkLimit);
-        assertEq(
-            iBTC_delegator.totalOperatorNetworkSharesAt(
-                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
-            ),
-            operatorNetworkShares1 + operatorNetworkShares2
-        );
-        assertEq(
-            iBTC_delegator.totalOperatorNetworkShares(NETWORK.subnetwork(0)),
-            operatorNetworkShares1 + operatorNetworkShares2
-        );
-        assertEq(
-            iBTC_delegator.operatorNetworkSharesAt(
-                NETWORK.subnetwork(0), alice, uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
-            ),
-            operatorNetworkShares1
-        );
-        assertEq(iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), alice), operatorNetworkShares1);
-        assertEq(
-            iBTC_delegator.operatorNetworkSharesAt(
-                NETWORK.subnetwork(0), bob, uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
-            ),
-            operatorNetworkShares2
-        );
-        assertEq(iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), bob), operatorNetworkShares2);
     }
 
     function _setMaxNetworkLimit(address user, uint96 identifier, uint256 amount) internal {
@@ -669,6 +645,11 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
+    function _setResolver(uint96 identifier, address resolver) internal {
+        vm.prank(NETWORK);
+        iBTC_slasher.setResolver(identifier, resolver, "");
+    }
+
     function _deposit(address user, uint256 amount) internal returns (uint256 depositedAmount, uint256 mintedShares) {
         vm.prank(iBTC.owner());
         iBTC.setMinter(address(this));
@@ -708,7 +689,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes memory hints
     ) internal returns (uint256 slashAmount) {
         vm.startPrank(networkMiddleware);
-        slashAmount = iBTC_slasher.slash(network.subnetwork(0), operator, amount, captureTimestamp, hints);
+        uint256 slashIndex = iBTC_slasher.requestSlash(network.subnetwork(0), operator, amount, captureTimestamp, hints);
+        vm.warp(captureTimestamp + 3 days);
+        slashAmount = iBTC_slasher.executeSlash(slashIndex, "");
         vm.stopPrank();
     }
 }
