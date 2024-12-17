@@ -86,7 +86,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address bob;
     uint256 bobPrivateKey;
 
-     address approvedSigner1;
+    address approvedSigner1;
     uint256 approvedSigner1Key;
     address approvedSigner2;
     uint256 approvedSigner2Key;
@@ -252,9 +252,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
         NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE).setMiddleware(address(iBTC_networkMiddleware));
         vm.stopPrank();
-             _setResolver(0, bob);
-
+        _setResolver(0, bob);
     }
+
     function test_SetNetworkLimit() public {
         uint256 amount1 = 1e10;
         uint256 amount2 = 1e9;
