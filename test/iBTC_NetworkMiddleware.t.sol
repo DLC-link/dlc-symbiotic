@@ -225,9 +225,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         iBTC_vault = iBTC_Vault(vault_);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
-        //NOTICE
-        // vm.prank(vault_);
-        // NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
 
         vaults.push(vault_);
         vm.startPrank(OWNER);
