@@ -16,6 +16,7 @@ import {MetadataService} from "core/test/service/MetadataService.t.sol";
 import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
 import {iBTC_GlobalReceiver} from "src/iBTC_GlobalReceiver.sol";
+import {NetworkMock} from "../test/mocks/NetworkMock.sol";
 
 import {IMigratablesFactory} from "@symbiotic/interfaces/common/IMigratablesFactory.sol";
 import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
@@ -50,9 +51,8 @@ contract DeployAll is Script {
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9; // 10 iBTC
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
 
-    // ------------------- NOTE: Those addresses should be replaced with our own address --------------------
-    address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-    address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+    address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
+    address public NETWORK;
 
     /*
     Rules:
@@ -188,6 +188,9 @@ contract DeployAll is Script {
         // --------------------------- Start NetworkMiddleware Deployment ---------------------------
         iBTC_delegator = NetworkRestakeDelegator(delegator_);
         iBTC_vault = iBTC_Vault(vault_);
+        NetworkMock networkMock = new NetworkMock();
+        NETWORK = address(networkMock);
+        networkMock.registerSubnetwork(0);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
         iBTC_networkMiddleware = new NetworkMiddleware(
@@ -203,9 +206,17 @@ contract DeployAll is Script {
             minimumThreshold
         );
         console2.log("NetworkMiddleware: ", address(iBTC_networkMiddleware));
+        _registerNetwork(address(iBTC_networkMiddleware));
 
         // ------------------------ End NetworkMiddleware Deployment -------------------------
 
         vm.stopBroadcast();
+    }
+
+    function _registerNetwork(
+        address middleware
+    ) internal {
+        NetworkMock(NETWORK).registerInRegistry(networkRegistry);
+        networkMiddlewareService.setMiddleware(middleware);
     }
 }

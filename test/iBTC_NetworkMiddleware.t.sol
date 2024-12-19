@@ -18,6 +18,7 @@ import {MetadataService} from "core/test/service/MetadataService.t.sol";
 import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
 import {iBTC_GlobalReceiver} from "src/iBTC_GlobalReceiver.sol";
+import {NetworkMock} from "./mocks/NetworkMock.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
@@ -62,9 +63,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
     bytes32 public constant NETWORK_LIMIT_SET_ROLE = keccak256("NETWORK_LIMIT_SET_ROLE");
     bytes32 public constant OPERATOR_NETWORK_SHARES_SET_ROLE = keccak256("OPERATOR_NETWORK_SHARES_SET_ROLE");
 
-    address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // first address network should be a multisig contract
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
-
+    address NETWORK; // first address network should be a multisig contract
     /*
     Rules:
     1. Vault Epoch Duration should be significantly greater than validatorSetCaptureDelay + Network Epoch + Slashing Window.
@@ -110,6 +110,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     IBTC iBTC;
     VetoSlasher iBTC_slasher;
     iBTC_GlobalReceiver iBTC_globalReceiver;
+    NetworkMock public network;
 
     event VetoSlash(uint256 indexed slashIndex, address indexed resolver);
 
@@ -119,6 +120,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         (bob, bobPrivateKey) = makeAddrAndKey("bob");
         (approvedSigner1, approvedSigner1Key) = makeAddrAndKey("approvedSigner1");
         (approvedSigner2, approvedSigner2Key) = makeAddrAndKey("approvedSigner2");
+        network = new NetworkMock();
+        NETWORK = address(network);
+        network.registerSubnetwork(0);
         networkRegistry = NetworkRegistry(NETWORK_REGISTRY);
         networkMiddlewareService = NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE);
         operatorRegistry = OperatorRegistry(OPERATOR_REGISTRY);
@@ -520,9 +524,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function _optInOperatorNetwork(address user, address network) internal {
+    function _optInOperatorNetwork(address user, address network_) internal {
         vm.startPrank(user);
-        network_optIn_service.optIn(network);
+        network_optIn_service.optIn(network_);
         vm.stopPrank();
     }
 
@@ -544,13 +548,13 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function _setNetworkLimit(address user, address network, uint256 amount) internal {
+    function _setNetworkLimit(address user, address network_, uint256 amount) internal {
         vm.startPrank(user);
-        iBTC_delegator.setNetworkLimit(network.subnetwork(0), amount);
+        iBTC_delegator.setNetworkLimit(network_.subnetwork(0), amount);
         vm.stopPrank();
     }
 
-    function _setOperatorNetworkShares(address user, address network, address operator, uint256 shares) internal {
+    function _setOperatorNetworkShares(address user, address network_, address operator, uint256 shares) internal {
         vm.startPrank(user);
         iBTC_delegator.setOperatorNetworkShares(network.subnetwork(0), operator, shares);
         vm.stopPrank();
