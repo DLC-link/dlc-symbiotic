@@ -7,33 +7,20 @@ import {OperatorRegistry} from "core/src/contracts/OperatorRegistry.sol";
 import {NetworkMiddleware} from "../src/iBTC_NetworkMiddleware.sol";
 import {NetworkRestakeDelegator} from "core/src/contracts/delegator/NetworkRestakeDelegator.sol";
 import {OptInService} from "core/src/contracts/service/OptInService.sol";
-import {iBTC_Vault} from "../src/iBTC_Vault.sol";
-import {Subnetwork} from "core/src/contracts/libraries/Subnetwork.sol";
 import {VaultConfigurator} from "src/iBTC_VaultConfigurator.sol";
 import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
-import {MetadataService} from "core/test/service/MetadataService.t.sol";
-import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
 import {iBTC_GlobalReceiver} from "src/iBTC_GlobalReceiver.sol";
 import {NetworkMock} from "../test/mocks/NetworkMock.sol";
 
-import {IMigratablesFactory} from "@symbiotic/interfaces/common/IMigratablesFactory.sol";
 import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
 import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
 import {IBaseDelegator} from "@symbiotic/interfaces/delegator/IBaseDelegator.sol";
 import {INetworkRestakeDelegator} from "@symbiotic/interfaces/delegator/INetworkRestakeDelegator.sol";
-import {IFullRestakeDelegator} from "@symbiotic/interfaces/delegator/IFullRestakeDelegator.sol";
-import {IOperatorSpecificDelegator} from "@symbiotic/interfaces/delegator/IOperatorSpecificDelegator.sol";
 import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
-import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
-import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
-import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
 import {IBurnerRouter} from "burners/src/interfaces/router/IBurnerRouter.sol";
-
-import {VaultConfigurator} from "../src/iBTC_VaultConfigurator.sol";
-import {iBTC_Vault} from "../src/iBTC_Vault.sol";
 
 contract DeployAll is Script {
     // ------------------------------- contracts on sepolia -------------------------------
@@ -46,11 +33,6 @@ contract DeployAll is Script {
     address constant SLASHER_FACTORY = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
     address constant NEWTORK_OPTIN_SERVICE = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
     address constant VAULT_OPTIN_SERVICE = 0x95CC0a052ae33941877c9619835A233D21D57351;
-    address constant OPERATOR_METADATA_SERVICE = 0x0999048aB8eeAfa053bF8581D4Aa451ab45755c9;
-    address constant NETWORK_METADATA_SERVICE = 0x0F7E58Cc4eA615E8B8BEB080dF8B8FDB63C21496;
-    uint256 constant MAX_WITHDRAW_AMOUNT = 1e9; // 10 iBTC
-    uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
-
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
     address public NETWORK;
 
@@ -72,21 +54,15 @@ contract DeployAll is Script {
     NetworkMiddleware public iBTC_networkMiddleware;
     BurnerRouter public burner;
     VaultConfigurator public vaultConfigurator;
-    iBTC_Vault public iBTC_vault;
     NetworkRegistry networkRegistry;
     OperatorRegistry operatorRegistry;
     NetworkRestakeDelegator iBTC_delegator;
     NetworkMiddlewareService networkMiddlewareService;
-    MetadataService operatorMetadataService;
-    MetadataService networkMetadataService;
-    BaseDelegatorHints baseDelegatorHints;
     NetworkMiddleware networkmiddleware;
     VetoSlasher iBTC_slasher;
     iBTC_GlobalReceiver iBTC_globalReceiver;
 
     function run() external {
-        address[] memory whitelistedDepositors;
-
         uint256 depositLimit = 1e10;
         address hook = 0x0000000000000000000000000000000000000000;
         uint64 delegatorIndex = 0;
@@ -99,15 +75,14 @@ contract DeployAll is Script {
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
         iBTC_globalReceiver = new iBTC_GlobalReceiver();
         iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
-        IBurnerRouter.NetworkReceiver[] memory networkReceiver;
-        IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceiver;
+        // burner setup
         IBurnerRouter.InitParams memory params = IBurnerRouter.InitParams({
             owner: OWNER,
             collateral: COLLATERAL,
-            delay: 0, //NOTE we can set a delay
+            delay: 0,
             globalReceiver: address(iBTC_globalReceiver),
-            networkReceivers: networkReceiver,
-            operatorNetworkReceivers: operatorNetworkReceiver
+            networkReceivers: new IBurnerRouter.NetworkReceiver[](0),
+            operatorNetworkReceivers: new IBurnerRouter.OperatorNetworkReceiver[](0)
         });
         BurnerRouter burnerTemplate = new BurnerRouter();
         BurnerRouterFactory burnerRouterFactory = new BurnerRouterFactory(address(burnerTemplate));
@@ -115,23 +90,24 @@ contract DeployAll is Script {
         burner = BurnerRouter(burnerAddress);
         (,, address deployer) = vm.readCallers();
 
-        bool depositWhitelist = whitelistedDepositors.length != 0;
-
+        // Vault setup
         bytes memory vaultParams = abi.encode(
             IVault.InitParams({
                 collateral: COLLATERAL,
                 burner: address(burner),
                 epochDuration: VAULT_EPOCH_DURATION,
-                depositWhitelist: depositWhitelist,
+                depositWhitelist: false,
                 isDepositLimit: depositLimit != 0,
                 depositLimit: depositLimit,
-                defaultAdminRoleHolder: depositWhitelist ? deployer : OWNER,
+                defaultAdminRoleHolder: OWNER,
                 depositWhitelistSetRoleHolder: OWNER,
                 depositorWhitelistRoleHolder: OWNER,
                 isDepositLimitSetRoleHolder: OWNER,
                 depositLimitSetRoleHolder: OWNER
             })
         );
+
+        // Role holders setup
         uint256 roleHolders = 1;
         address[] memory networkLimitSetRoleHolders = new address[](roleHolders);
         address[] memory operatorNetworkLimitSetRoleHolders = new address[](roleHolders);
@@ -139,6 +115,8 @@ contract DeployAll is Script {
         networkLimitSetRoleHolders[0] = OWNER;
         operatorNetworkLimitSetRoleHolders[0] = OWNER;
         operatorNetworkSharesSetRoleHolders[0] = OWNER;
+
+        // Delegator params
         bytes memory delegatorParams;
         delegatorParams = abi.encode(
             INetworkRestakeDelegator.InitParams({
@@ -168,17 +146,18 @@ contract DeployAll is Script {
             })
         );
 
-        if (depositWhitelist) {
-            iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), OWNER);
-            iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+        // we don't need to set deposit whitelist for now
+        // if (depositWhitelist) {
+        //     iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), OWNER);
+        //     iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
 
-            for (uint256 i; i < whitelistedDepositors.length; ++i) {
-                iBTC_Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
-            }
+        //     for (uint256 i; i < whitelistedDepositors.length; ++i) {
+        //         iBTC_Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
+        //     }
 
-            iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
-            iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
-        }
+        //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+        //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
+        // }
 
         console2.log("Vault: ", vault_);
         console2.log("Delegator: ", delegator_);
@@ -186,10 +165,9 @@ contract DeployAll is Script {
         // ---------------------------------- End Vault Deployment ----------------------------------
 
         // --------------------------- Start NetworkMiddleware Deployment ---------------------------
-        iBTC_delegator = NetworkRestakeDelegator(delegator_);
-        iBTC_vault = iBTC_Vault(vault_);
         NetworkMock networkMock = new NetworkMock();
         NETWORK = address(networkMock);
+        console2.log("NETWORK: ", NETWORK);
         networkMock.registerSubnetwork(0);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
