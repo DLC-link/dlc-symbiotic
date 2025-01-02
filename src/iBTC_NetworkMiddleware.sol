@@ -5,6 +5,8 @@ import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
+import {IDefaultOperatorRewards} from "rewards/src/interfaces/defaultOperatorRewards/IDefaultOperatorRewards.sol";
+import {IDefaultStakerRewards} from "rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
 import {IRegistry} from "@symbiotic/interfaces/common/IRegistry.sol";
 import {IEntity} from "@symbiotic/interfaces/common/IEntity.sol";
 import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
@@ -14,6 +16,7 @@ import {IOptInService} from "@symbiotic/interfaces/service/IOptInService.sol";
 import {IEntity} from "@symbiotic/interfaces/common/IEntity.sol";
 import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
 import {MultisigValidated} from "./libraries/MultisigValidated.sol";
@@ -23,6 +26,7 @@ import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
+    using SafeERC20 for IERC20;
     using Subnetwork for address;
 
     error NotOperator();
@@ -48,6 +52,10 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     error UnknownSlasherType();
     error NotVetoSlasher();
 
+    error ZeroTotalStake();
+    error ZeroRewardAmount();
+    error InsufficientBalance();
+
     struct ValidatorData {
         uint256 stake;
         bytes32 key;
@@ -67,6 +75,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     address public immutable OPERATOR_NET_OPTIN;
     address public immutable OPERATOR_VAULT_OPTIN;
     address public immutable OWNER;
+    address public immutable STAKER_REWARDS;
+    address public immutable OPERATOR_REWARDS;
+    address public immutable REWARD_TOKEN;
     uint48 public immutable EPOCH_DURATION;
     uint48 public immutable SLASHING_WINDOW;
     uint48 public immutable START_TIME;
@@ -82,6 +93,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
     EnumerableMap.AddressToUintMap private operators;
     EnumerableMap.AddressToUintMap private vaults;
+
+    event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
+    event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
 
     modifier updateStakeCache(
         uint48 epoch
@@ -99,6 +113,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         address _vaultRegistry,
         address _operatorNetOptin,
         address _owner,
+        address _stakerReward,
+        address _operatorReward,
+        address _rewardToken,
         uint48 _epochDuration,
         uint48 _slashingWindow,
         uint16 _threshold,
@@ -112,6 +129,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         EPOCH_DURATION = _epochDuration;
         NETWORK = _network;
         OWNER = _owner;
+        STAKER_REWARDS = _stakerReward;
+        OPERATOR_REWARDS = _operatorReward;
+        REWARD_TOKEN = _rewardToken;
         OPERATOR_REGISTRY = _operatorRegistry;
         NETWORK_REGISTRY = _networkRegistry;
         VAULT_REGISTRY = _vaultRegistry;
@@ -420,6 +440,48 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
 
         totalStakeCached[epoch] = true;
         totalStakeCache[epoch] = totalStake;
+    }
+
+    function distributeStakerRewards(
+        uint256 distributeAmount,
+        uint48 timestamp,
+        uint256 maxAdminFee,
+        bytes calldata activeSharesHint,
+        bytes calldata activeStakeHint
+    ) public onlyOwner {
+        uint48 currentEpoch = getCurrentEpoch();
+        uint256 totalStake = getTotalStake(currentEpoch);
+
+        if (totalStake == 0) {
+            revert ZeroTotalStake();
+        }
+
+        if (distributeAmount == 0) {
+            revert ZeroRewardAmount();
+        }
+
+        if (IERC20(REWARD_TOKEN).balanceOf(address(this)) < distributeAmount) {
+            revert InsufficientBalance();
+        }
+
+        IERC20(REWARD_TOKEN).approve(STAKER_REWARDS, distributeAmount);
+        bytes memory distributionData = abi.encode(timestamp, maxAdminFee, activeSharesHint, activeStakeHint);
+
+        IDefaultStakerRewards(STAKER_REWARDS).distributeRewards(
+            NETWORK, REWARD_TOKEN, distributeAmount, distributionData
+        );
+
+        emit StakerRewardsDistributed(currentEpoch, distributeAmount, totalStake, block.timestamp);
+    }
+
+    function distributeOperatorRewards(uint256 rewardAmount, bytes32 merkleRoot) public onlyOwner {
+        if (rewardAmount == 0) {
+            revert ZeroRewardAmount();
+        }
+
+        IDefaultOperatorRewards(OPERATOR_REWARDS).distributeRewards(NETWORK, REWARD_TOKEN, rewardAmount, merkleRoot);
+
+        emit OperatorRewardsDistributed(getCurrentEpoch(), rewardAmount, block.timestamp);
     }
 
     function _calcTotalStake(

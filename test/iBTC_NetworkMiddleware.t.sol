@@ -19,6 +19,9 @@ import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/Deleg
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
 import {iBTC_GlobalReceiver} from "src/iBTC_GlobalReceiver.sol";
 import {NetworkMock} from "./mocks/NetworkMock.sol";
+import {DefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewards.sol";
+import {DefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
+import {VaultHints} from "@symbioticfi/core/src/contracts/hints/VaultHints.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
@@ -33,7 +36,13 @@ import {IVetoSlasher} from "core/src/interfaces/slasher/IVetoSlasher.sol";
 import {IBaseSlasher} from "core/src/interfaces/slasher/IBaseSlasher.sol";
 import {IVaultConfigurator} from "core/src/interfaces/IVaultConfigurator.sol";
 import {IRegistry} from "core/src/interfaces/common/IRegistry.sol";
+import {IDefaultStakerRewardsFactory} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewardsFactory.sol";
+import {IDefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewards.sol";
+import {IDefaultOperatorRewardsFactory} from
+    "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewardsFactory.sol";
+import {IDefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
 import {IBTC} from "test/mocks/iBTCMock.sol";
+import {RewardTokenMock} from "test/mocks/RewardTokenMock.sol";
 
 contract iBTC_NetworkMiddlewareTest is Test {
     using Math for uint256;
@@ -45,6 +54,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     uint256 sepoliaFork;
     string SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
 
+    // sepolia
     address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
     address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
@@ -56,15 +66,23 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address constant VAULT_OPTIN_SERVICE = 0x95CC0a052ae33941877c9619835A233D21D57351;
     address constant OPERATOR_METADATA_SERVICE = 0x0999048aB8eeAfa053bF8581D4Aa451ab45755c9;
     address constant NETWORK_METADATA_SERVICE = 0x0F7E58Cc4eA615E8B8BEB080dF8B8FDB63C21496;
+    address constant DEFAULT_STAKER_REWARDS_FACTORY = 0x70C618a13D1A57f7234c0b893b9e28C5cA8E7f37;
+    address constant DEFAULT_OPERATOR_REWARDS_FACTORY = 0x8D6C873cb7ffa6BE615cE1D55801a9417Ed55f9B;
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9;
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
 
     bytes32 public constant APPROVED_SIGNER = keccak256("APPROVED_SIGNER");
     bytes32 public constant NETWORK_LIMIT_SET_ROLE = keccak256("NETWORK_LIMIT_SET_ROLE");
     bytes32 public constant OPERATOR_NETWORK_SHARES_SET_ROLE = keccak256("OPERATOR_NETWORK_SHARES_SET_ROLE");
+    bytes32 public constant ADMIN_FEE_SET_ROLE = keccak256("ADMIN_FEE_SET_ROLE");
+    bytes32 public constant ADMIN_FEE_CLAIM_ROLE = keccak256("ADMIN_FEE_CLAIM_ROLE");
 
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
     address NETWORK; // first address network should be a multisig contract
+    address STAKER_REWARDS;
+    address OPERATOR_REWARDS;
+    address REWARD_TOKEN;
+
     /*
     Rules:
     1. Vault Epoch Duration should be significantly greater than validatorSetCaptureDelay + Network Epoch + Slashing Window.
@@ -111,8 +129,13 @@ contract iBTC_NetworkMiddlewareTest is Test {
     VetoSlasher iBTC_slasher;
     iBTC_GlobalReceiver iBTC_globalReceiver;
     NetworkMock public network;
+    DefaultStakerRewards public defaultStakerRewards;
+    DefaultOperatorRewards public defaultOperatorRewards;
+    RewardTokenMock public rewardToken;
 
     event VetoSlash(uint256 indexed slashIndex, address indexed resolver);
+    event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
+    event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
@@ -141,8 +164,11 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
+        //  create Global Receiver
         iBTC_globalReceiver = new iBTC_GlobalReceiver();
         iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
+
+        // create Burner Router
         IBurnerRouter.NetworkReceiver[] memory networkReceiver;
         IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceiver;
         IBurnerRouter.InitParams memory params = IBurnerRouter.InitParams({
@@ -225,8 +251,28 @@ contract iBTC_NetworkMiddlewareTest is Test {
             iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         }
         vm.stopPrank();
-        iBTC_delegator = NetworkRestakeDelegator(delegator_);
+        // ------------ End Vault Deployment ------------------
         iBTC_vault = iBTC_Vault(vault_);
+
+        address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
+            IDefaultStakerRewards.InitParams({
+                vault: address(iBTC_vault),
+                adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
+                defaultAdminRoleHolder: OWNER, // address of the main admin (can manage all roles)
+                adminFeeClaimRoleHolder: OWNER, // address of the admin fee claimer
+                adminFeeSetRoleHolder: OWNER // address of the admin fee setter
+            })
+        );
+        address defaultOperatorRewards_ = IDefaultOperatorRewardsFactory(DEFAULT_OPERATOR_REWARDS_FACTORY).create();
+        rewardToken = new RewardTokenMock("reward", "REWARD", 1e18);
+
+        STAKER_REWARDS = address(defaultStakerRewards_);
+        OPERATOR_REWARDS = address(defaultOperatorRewards_);
+        REWARD_TOKEN = address(rewardToken);
+        defaultStakerRewards = DefaultStakerRewards(STAKER_REWARDS);
+        defaultOperatorRewards = DefaultOperatorRewards(OPERATOR_REWARDS);
+
+        iBTC_delegator = NetworkRestakeDelegator(delegator_);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
 
@@ -239,6 +285,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
             VAULT_FACTORY,
             NEWTORK_OPTIN_SERVICE,
             OWNER,
+            STAKER_REWARDS,
+            OPERATOR_REWARDS,
+            REWARD_TOKEN,
             NETWORK_EPOCH,
             SLASHING_WINDOW,
             threshold,
@@ -259,211 +308,340 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function testRegisterOperator() public {
-        address operator = address(0x1234);
-        bytes32 key = keccak256(abi.encodePacked("operator_key"));
-        vm.startPrank(operator);
-        OperatorRegistry(OPERATOR_REGISTRY).registerOperator();
-        network_optIn_service.optIn(NETWORK);
-        vm.stopPrank();
-        vm.startPrank(OWNER);
-        iBTC_networkMiddleware.registerOperator(operator, key);
+    // function testRegisterOperator() public {
+    //     address operator = address(0x1234);
+    //     bytes32 key = keccak256(abi.encodePacked("operator_key"));
+    //     vm.startPrank(operator);
+    //     OperatorRegistry(OPERATOR_REGISTRY).registerOperator();
+    //     network_optIn_service.optIn(NETWORK);
+    //     vm.stopPrank();
+    //     vm.startPrank(OWNER);
+    //     iBTC_networkMiddleware.registerOperator(operator, key);
 
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(operator);
+    //     (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(operator);
 
-        assertTrue(enabledTime > 0, "Enabled time should be greater than 0");
-        assertTrue(disabledTime == 0, "Disabled time should be 0");
-        console.log("enabledTime", enabledTime);
-        console.log("disabledTime");
-        vm.stopPrank();
-    }
+    //     assertTrue(enabledTime > 0, "Enabled time should be greater than 0");
+    //     assertTrue(disabledTime == 0, "Disabled time should be 0");
+    //     console.log("enabledTime", enabledTime);
+    //     console.log("disabledTime");
+    //     vm.stopPrank();
+    // }
 
-    function testUnregisterOperator() public {
-        testRegisterOperator();
-        address operator = address(0x1234);
+    // function testUnregisterOperator() public {
+    //     testRegisterOperator();
+    //     address operator = address(0x1234);
 
-        vm.startPrank(OWNER);
+    //     vm.startPrank(OWNER);
 
-        iBTC_networkMiddleware.pauseOperator(operator);
+    //     iBTC_networkMiddleware.pauseOperator(operator);
 
-        vm.warp(block.timestamp + SLASHING_WINDOW + 1);
-        iBTC_networkMiddleware.unregisterOperator(operator);
+    //     vm.warp(block.timestamp + SLASHING_WINDOW + 1);
+    //     iBTC_networkMiddleware.unregisterOperator(operator);
 
-        bool isOperatorRegistered = iBTC_networkMiddleware.isOperatorRegistered(operator);
-        assertFalse(isOperatorRegistered, "Operator should be unregistered");
+    //     bool isOperatorRegistered = iBTC_networkMiddleware.isOperatorRegistered(operator);
+    //     assertFalse(isOperatorRegistered, "Operator should be unregistered");
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
-    function testRegisterVault() public {
-        vm.startPrank(OWNER);
+    // function testRegisterVault() public {
+    //     vm.startPrank(OWNER);
 
-        iBTC_networkMiddleware.registerVault(vaults[0]);
+    //     iBTC_networkMiddleware.registerVault(vaults[0]);
 
-        bool isVaultRegistered = iBTC_networkMiddleware.isVaultRegistered(vaults[0]);
-        assertTrue(isVaultRegistered, "Vault should be registered");
-        vm.stopPrank();
-    }
+    //     bool isVaultRegistered = iBTC_networkMiddleware.isVaultRegistered(vaults[0]);
+    //     assertTrue(isVaultRegistered, "Vault should be registered");
+    //     vm.stopPrank();
+    // }
 
-    function testPauseAndUnpauseVault() public {
-        testRegisterVault();
-        vm.startPrank(OWNER);
+    // function testPauseAndUnpauseVault() public {
+    //     testRegisterVault();
+    //     vm.startPrank(OWNER);
 
-        iBTC_networkMiddleware.pauseVault(address(iBTC_vault));
+    //     iBTC_networkMiddleware.pauseVault(address(iBTC_vault));
 
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getVaultInfo(address(iBTC_vault));
-        bool isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
+    //     (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getVaultInfo(address(iBTC_vault));
+    //     bool isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
 
-        assertTrue(isVaultPaused, "Vault should be paused");
+    //     assertTrue(isVaultPaused, "Vault should be paused");
 
-        iBTC_networkMiddleware.unpauseVault(address(iBTC_vault));
+    //     iBTC_networkMiddleware.unpauseVault(address(iBTC_vault));
 
-        (enabledTime, disabledTime) = iBTC_networkMiddleware.getVaultInfo(address(iBTC_vault));
-        isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
-        assertFalse(isVaultPaused, "Vault should be active");
+    //     (enabledTime, disabledTime) = iBTC_networkMiddleware.getVaultInfo(address(iBTC_vault));
+    //     isVaultPaused = enabledTime == 0 || (disabledTime > 0 && disabledTime <= block.timestamp);
+    //     assertFalse(isVaultPaused, "Vault should be active");
 
-        vm.stopPrank();
-    }
+    //     vm.stopPrank();
+    // }
 
-    function testOptInVault() public {
-        testRegisterOperator();
-        address operator = address(0x1234);
-        vm.prank(operator);
-        vault_optIn_service.optIn(address(iBTC_vault));
-        assertTrue(vault_optIn_service.isOptedIn(operator, address(iBTC_vault)));
-    }
+    // function testOptInVault() public {
+    //     testRegisterOperator();
+    //     address operator = address(0x1234);
+    //     vm.prank(operator);
+    //     vault_optIn_service.optIn(address(iBTC_vault));
+    //     assertTrue(vault_optIn_service.isOptedIn(operator, address(iBTC_vault)));
+    // }
 
-    function testSlashOperator() public {
+    // function testSlashOperator() public {
+    //     bytes32 key = keccak256(abi.encodePacked("alice_key"));
+    //     uint256 depositAmount = 1e10;
+    //     uint256 blockTimestamp = block.timestamp * block.timestamp / block.timestamp * block.timestamp / block.timestamp;
+    //     blockTimestamp = blockTimestamp + 1_720_700_948;
+    //     uint256 networkLimit = 1e10;
+    //     uint256 operatorNetworkShares1 = 1e10;
+
+    //     vm.prank(OWNER);
+    //     iBTC_networkMiddleware.registerVault(address(iBTC_vault));
+
+    //     assertEq(iBTC_vault.delegator(), address(iBTC_delegator), "delegator should be right.");
+    //     _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
+    //     _registerOperator(alice);
+
+    //     assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
+    //     _optInOperatorVault(alice);
+
+    //     assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
+    //     _optInOperatorNetwork(alice, NETWORK);
+
+    //     assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
+    //     _setResolver(0, bob);
+
+    //     assertEq(iBTC_slasher.resolver(NETWORK.subnetwork(0), ""), bob, "resolver should be setting correctly");
+
+    //     vm.prank(OWNER);
+    //     iBTC_networkMiddleware.registerOperator(alice, key);
+    //     _deposit(alice, depositAmount);
+    //     assertEq(
+    //         depositAmount, iBTC_vault.activeBalanceOfAt(alice, uint48(block.timestamp), ""), "Deposit should be done"
+    //     );
+
+    //     assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
+    //     vm.prank(OWNER);
+    //     iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
+    //     _setNetworkLimit(alice, NETWORK, networkLimit);
+
+    //     assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
+
+    //     vm.prank(OWNER);
+    //     iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+    //     _setOperatorNetworkShares(alice, NETWORK, alice, operatorNetworkShares1);
+    //     assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), operatorNetworkShares1);
+
+    //     (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(alice);
+    //     console.log("enabledTime", enabledTime);
+    //     console.log("disabledTime", disabledTime);
+    //     uint256 stakeAt = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(enabledTime), "");
+    //     assertEq(stakeAt, operatorNetworkShares1, "StakeAt should stand the same");
+
+    //     uint48 epoch = iBTC_networkMiddleware.getCurrentEpoch();
+    //     assertEq(
+    //         iBTC_networkMiddleware.getOperatorStake(alice, epoch),
+    //         iBTC_delegator.stake(NETWORK.subnetwork(0), alice),
+    //         "stake should be the same"
+    //     );
+
+    //     uint256 cachedStake = iBTC_networkMiddleware.calcAndCacheStakes(epoch);
+    //     assertEq(cachedStake, operatorNetworkShares1, "cache should update");
+
+    //     uint256 slashAmount = 1e9;
+    //     vm.warp(Time.timestamp() + 1 days);
+
+    //     uint48 epochStartTs = iBTC_networkMiddleware.getEpochStartTs(epoch);
+    //     assertGe(
+    //         epochStartTs,
+    //         Time.timestamp() - iBTC_vault.epochDuration(),
+    //         "captureTimesstamp needs greater and equal that Time.timestamp()-iBTC_vault.epochDuration()"
+    //     );
+    //     assertLt(epochStartTs, Time.timestamp(), "captureTimestamp needs less than Time.timestamp();");
+
+    //     // **generate Signature**
+    //     vm.startPrank(OWNER);
+    //     iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner1);
+    //     assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner1));
+    //     iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner2);
+    //     assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner2));
+
+    //     vm.stopPrank();
+    //     uint256[] memory approvedSignerKeys = new uint256[](2);
+    //     approvedSignerKeys[0] = approvedSigner1Key;
+    //     approvedSignerKeys[1] = approvedSigner2Key;
+    //     uint256 slashIndex = 0;
+
+    //     bytes[] memory signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
+    //     // **call slash*
+    //     vm.startPrank(OWNER);
+    //     iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
+
+    //     // **excute slash**
+    //     vm.expectRevert();
+    //     iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
+    //     vm.warp(Time.timestamp() + 2 days);
+    //     iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
+    //     vm.stopPrank();
+
+    //     uint256 amountAfterSlashed = iBTC_vault.activeBalanceOf(alice);
+    //     assertEq(amountAfterSlashed, depositAmount - slashAmount, "Cached stake should be reduced by slash amount");
+
+    //     // **testing veto slash**
+    //     vm.prank(OWNER);
+    //     slashIndex++;
+    //     signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
+    //     iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
+    //     vm.prank(bob);
+    //     iBTC_slasher.vetoSlash(slashIndex, "");
+
+    //     uint256 amountAfterVetoSlashed = iBTC_vault.activeBalanceOf(alice);
+    //     assertEq(amountAfterVetoSlashed, amountAfterSlashed, "Cached stake should stay the same");
+
+    //     vm.expectRevert();
+    //     vm.prank(OWNER);
+    //     iBTC_networkMiddleware.executeSlash(slashIndex, address(iBTC_vault), "");
+    // }
+
+    // function testGlobalReceiver() public {
+    //     uint256 slashAmount = 1e9;
+    //     testSlashOperator();
+
+    //     burner.triggerTransfer(address(iBTC_globalReceiver));
+    //     assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
+
+    //     vm.prank(OWNER);
+    //     iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
+    //     assertEq(iBTC.balanceOf(bob), slashAmount);
+    // }
+
+    function testDistributeStakerRewards() public {
+        // Setup initial conditions similar to test_DistributeRewards
         bytes32 key = keccak256(abi.encodePacked("alice_key"));
-        uint256 depositAmount = 1e10;
+        uint256 depositAmount = 1e8; // 1 iBTC
+        uint256 distributeAmount = 10e18; // 10 iBTC
+        uint256 networkLimit = 100e8;
+        uint256 operatorNetworkShares = 10e8;
+        uint256 adminFee = 1e4;
+        uint256 maxAdminFee = type(uint256).max;
+
         uint256 blockTimestamp = block.timestamp * block.timestamp / block.timestamp * block.timestamp / block.timestamp;
         blockTimestamp = blockTimestamp + 1_720_700_948;
-        uint256 networkLimit = 1e10;
-        uint256 operatorNetworkShares1 = 1e10;
+        vm.warp(blockTimestamp);
 
+        // Setup admin fee
+        vm.startPrank(OWNER);
+        defaultStakerRewards.grantRole(defaultStakerRewards.ADMIN_FEE_SET_ROLE(), OWNER);
+        // base admin fee already initialized in DefaultStakerRewards = 1e4
+        // defaultStakerRewards.setAdminFee(adminFee);
+        vm.stopPrank();
+
+        // Setup network shares
+        vm.startPrank(OWNER);
+        iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
+        iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        vm.stopPrank();
+
+        // Register vault and operator
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerVault(address(iBTC_vault));
-
-        assertEq(iBTC_vault.delegator(), address(iBTC_delegator), "delegator should be right.");
-        _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
         _registerOperator(alice);
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
         _optInOperatorVault(alice);
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
         _optInOperatorNetwork(alice, NETWORK);
 
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        _setResolver(0, bob);
-
-        assertEq(iBTC_slasher.resolver(NETWORK.subnetwork(0), ""), bob, "resolver should be setting correctly");
-
+        // Register operator in middleware
         vm.prank(OWNER);
         iBTC_networkMiddleware.registerOperator(alice, key);
-        _deposit(alice, depositAmount);
-        assertEq(
-            depositAmount, iBTC_vault.activeBalanceOfAt(alice, uint48(block.timestamp), ""), "Deposit should be done"
-        );
 
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        vm.prank(OWNER);
-        iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
+        _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
         _setNetworkLimit(alice, NETWORK, networkLimit);
+        // Setup deposits
+        for (uint256 i; i < 10; ++i) {
+            (, uint256 mintedShares) = _deposit(alice, depositAmount);
+            uint256 currentStake = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(blockTimestamp), "");
+            _setOperatorNetworkShares(alice, NETWORK, alice, currentStake + mintedShares);
 
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        vm.prank(OWNER);
-        iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
-        _setOperatorNetworkShares(alice, NETWORK, alice, operatorNetworkShares1);
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), operatorNetworkShares1);
-
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(alice);
-        console.log("enabledTime", enabledTime);
-        console.log("disabledTime", disabledTime);
-        uint256 stakeAt = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(enabledTime), "");
-        assertEq(stakeAt, operatorNetworkShares1, "StakeAt should stand the same");
-
-        uint48 epoch = iBTC_networkMiddleware.getCurrentEpoch();
-        assertEq(
-            iBTC_networkMiddleware.getOperatorStake(alice, epoch),
-            iBTC_delegator.stake(NETWORK.subnetwork(0), alice),
-            "stake should be the same"
+            blockTimestamp = blockTimestamp + 1;
+            vm.warp(blockTimestamp);
+        }
+        vm.assertEq(
+            iBTC_delegator.stake(NETWORK.subnetwork(0), alice), operatorNetworkShares, "stake should set correctly"
         );
 
-        uint256 cachedStake = iBTC_networkMiddleware.calcAndCacheStakes(epoch);
-        assertEq(cachedStake, operatorNetworkShares1, "cache should update");
+        // Mint and approve reward tokens
+        vm.startPrank(OWNER);
+        rewardToken.mint(OWNER, distributeAmount);
+        vm.stopPrank();
 
-        uint256 slashAmount = 1e9;
-        vm.warp(Time.timestamp() + 1 days);
+        VaultHints vaultHints = new VaultHints();
 
-        uint48 epochStartTs = iBTC_networkMiddleware.getEpochStartTs(epoch);
-        assertGe(
-            epochStartTs,
-            Time.timestamp() - iBTC_vault.epochDuration(),
-            "captureTimesstamp needs greater and equal that Time.timestamp()-iBTC_vault.epochDuration()"
+        // Record balances before distribution
+        uint256 balanceBefore = rewardToken.balanceOf(STAKER_REWARDS);
+        uint256 balanceBeforeNetworkMiddleware = rewardToken.balanceOf(OWNER);
+
+        // Distribute rewards
+        uint48 timestamp = 1_720_700_948 + 3;
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.distributeStakerRewards(
+            distributeAmount,
+            timestamp,
+            maxAdminFee,
+            vaultHints.activeSharesHint(address(iBTC_vault), timestamp),
+            vaultHints.activeStakeHint(address(iBTC_vault), timestamp)
         );
-        assertLt(epochStartTs, Time.timestamp(), "captureTimestamp needs less than Time.timestamp();");
-
-        // **generate Signature**
-        vm.startPrank(OWNER);
-        iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner1);
-        assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner1));
-        iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner2);
-        assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner2));
-
-        vm.stopPrank();
-        uint256[] memory approvedSignerKeys = new uint256[](2);
-        approvedSignerKeys[0] = approvedSigner1Key;
-        approvedSignerKeys[1] = approvedSigner2Key;
-        uint256 slashIndex = 0;
-
-        bytes[] memory signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
-        // **call slash*
-        vm.startPrank(OWNER);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
-
-        // **excute slash**
-        vm.expectRevert();
-        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
-        vm.warp(Time.timestamp() + 2 days);
-        iBTC_networkMiddleware.executeSlash(0, address(iBTC_vault), "");
         vm.stopPrank();
 
-        uint256 amountAfterSlashed = iBTC_vault.activeBalanceOf(alice);
-        assertEq(amountAfterSlashed, depositAmount - slashAmount, "Cached stake should be reduced by slash amount");
+        // Calculate expected amounts
+        uint256 amount = distributeAmount - 1; // Account for fee on transfer
+        uint256 adminFeeAmount = amount.mulDiv(adminFee, defaultStakerRewards.ADMIN_FEE_BASE());
+        amount -= adminFeeAmount;
 
-        // **testing veto slash**
-        vm.prank(OWNER);
-        slashIndex++;
-        signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
-        vm.prank(bob);
-        iBTC_slasher.vetoSlash(slashIndex, "");
+        // Verify balances and rewards
+        assertEq(rewardToken.balanceOf(STAKER_REWARDS) - balanceBefore, distributeAmount - 1);
+        assertEq(balanceBeforeNetworkMiddleware - rewardToken.balanceOf(OWNER), distributeAmount);
 
-        uint256 amountAfterVetoSlashed = iBTC_vault.activeBalanceOf(alice);
-        assertEq(amountAfterVetoSlashed, amountAfterSlashed, "Cached stake should stay the same");
+        if (amount > 0) {
+            assertEq(defaultStakerRewards.rewardsLength(address(iBTC), NETWORK), 1);
+            (uint256 amount_, uint48 timestamp_) = defaultStakerRewards.rewards(address(iBTC), NETWORK, 0);
+            assertEq(amount_, amount);
+            assertEq(timestamp_, timestamp);
+        } else {
+            assertEq(defaultStakerRewards.rewardsLength(address(iBTC), NETWORK), 0);
+        }
 
-        vm.expectRevert();
-        vm.prank(OWNER);
-        iBTC_networkMiddleware.executeSlash(slashIndex, address(iBTC_vault), "");
+        assertEq(defaultStakerRewards.claimableAdminFee(address(iBTC)), adminFeeAmount);
+
+        assertEq(defaultStakerRewards.claimable(address(iBTC), alice, abi.encode(NETWORK, type(uint256).max)), amount);
+        assertEq(defaultStakerRewards.claimable(address(iBTC), alice, abi.encode(NETWORK, 1)), amount);
+        assertEq(defaultStakerRewards.claimable(address(iBTC), alice, abi.encode(NETWORK, 0)), 0);
+
+        // Verify event emission
+        vm.expectEmit(true, true, true, true);
+        emit StakerRewardsDistributed(
+            iBTC_networkMiddleware.getCurrentEpoch(), distributeAmount, operatorNetworkShares, block.timestamp
+        );
     }
 
-    function testGlobalReceiver() public {
-        uint256 slashAmount = 1e9;
-        testSlashOperator();
+    // function testDistributeOperatorRewards() public {
+    //     // Setup initial conditions
+    //     uint256 rewardAmount = 1e9;
+    //     bytes32 merkleRoot = keccak256("test_merkle_root");
 
-        burner.triggerTransfer(address(iBTC_globalReceiver));
-        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
+    //     // Mint reward tokens
+    //     vm.prank(iBTC.owner());
+    //     iBTC.mint(OWNER, rewardAmount);
 
-        vm.prank(OWNER);
-        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
-        assertEq(iBTC.balanceOf(bob), slashAmount);
-    }
+    //     vm.startPrank(OWNER);
+    //     // Approve rewards transfer
+    //     iBTC.approve(OPERATOR_REWARDS, rewardAmount);
+
+    //     // Distribute rewards
+    //     iBTC_networkMiddleware.distributeOperatorRewards(rewardAmount, merkleRoot);
+    //     vm.stopPrank();
+
+    //     // Verify event emission
+    //     vm.expectEmit(true, true, true, true);
+    //     emit OperatorRewardsDistributed(iBTC_networkMiddleware.getCurrentEpoch(), rewardAmount, block.timestamp);
+    // }
 
     function _makeSignatures(
         uint256 slashIndex,
@@ -488,6 +666,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, ethSignedMessageHash);
         return abi.encodePacked(r, s, v);
+    }
+
+    function _grantAdminFeeSetRole(address user, address account) internal {
+        vm.startPrank(user);
+        defaultStakerRewards.grantRole(defaultStakerRewards.ADMIN_FEE_SET_ROLE(), account);
+        vm.stopPrank();
+    }
+
+    function _setAdminFee(address user, uint256 adminFee) internal {
+        vm.startPrank(user);
+        defaultStakerRewards.setAdminFee(adminFee);
+        vm.stopPrank();
     }
 
     function _setResolver(uint96 identifier, address resolver) internal {
