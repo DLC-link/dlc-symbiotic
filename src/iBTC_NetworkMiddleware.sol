@@ -448,9 +448,9 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         uint256 maxAdminFee,
         bytes calldata activeSharesHint,
         bytes calldata activeStakeHint
-    ) public onlyOwner {
-        uint48 currentEpoch = getCurrentEpoch();
-        uint256 totalStake = getTotalStake(currentEpoch);
+    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+        uint48 epoch = getEpochAtTs(timestamp);
+        uint256 totalStake = getTotalStake(epoch);
 
         if (totalStake == 0) {
             revert ZeroTotalStake();
@@ -471,17 +471,23 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
             NETWORK, REWARD_TOKEN, distributeAmount, distributionData
         );
 
-        emit StakerRewardsDistributed(currentEpoch, distributeAmount, totalStake, block.timestamp);
+        emit StakerRewardsDistributed(epoch, distributeAmount, totalStake, block.timestamp);
     }
 
-    function distributeOperatorRewards(uint256 rewardAmount, bytes32 merkleRoot) public onlyOwner {
-        if (rewardAmount == 0) {
+    function distributeOperatorRewards(
+        uint256 distributeAmount,
+        bytes32 merkleRoot
+    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+        if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }
+        if (IERC20(REWARD_TOKEN).balanceOf(address(this)) < distributeAmount) {
+            revert InsufficientBalance();
+        }
+        IERC20(REWARD_TOKEN).approve(OPERATOR_REWARDS, distributeAmount);
+        IDefaultOperatorRewards(OPERATOR_REWARDS).distributeRewards(NETWORK, REWARD_TOKEN, distributeAmount, merkleRoot);
 
-        IDefaultOperatorRewards(OPERATOR_REWARDS).distributeRewards(NETWORK, REWARD_TOKEN, rewardAmount, merkleRoot);
-
-        emit OperatorRewardsDistributed(getCurrentEpoch(), rewardAmount, block.timestamp);
+        emit OperatorRewardsDistributed(getCurrentEpoch(), distributeAmount, block.timestamp);
     }
 
     function _calcTotalStake(
