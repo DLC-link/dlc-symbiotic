@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../../lib/core/src/contracts/libraries/Subnetwork.sol";
 import {NetworkRegistry} from "core/src/contracts/NetworkRegistry.sol";
+import {NetworkMiddlewareService} from "core/src/contracts/service/NetworkMiddlewareService.sol";
 
 contract NetworkMock {
     using Subnetwork for address;
@@ -16,9 +17,13 @@ contract NetworkMock {
     event SubnetworkUnregistered(uint96 indexed identifier, bytes32 indexed subnetworkId);
 
     function registerInRegistry(
-        NetworkRegistry registry
+        address registry
     ) external {
-        registry.registerNetwork();
+        NetworkRegistry(registry).registerNetwork();
+    }
+
+    function setMiddleware(address networkMiddlewareService, address middleware) external {
+        NetworkMiddlewareService(networkMiddlewareService).setMiddleware(middleware);
     }
 
     function registerSubnetwork(

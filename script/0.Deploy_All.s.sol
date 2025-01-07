@@ -91,16 +91,18 @@ contract DeployAll is Script {
         uint16 minimumThreshold = 2;
         vm.startBroadcast();
 
-        // ------------------------------- Start Network Setup -------------------------------
-        networkRegistry = NetworkRegistry(NETWORK_REGISTRY);
-        operatorRegistry = OperatorRegistry(OPERATOR_REGISTRY);
-        networkMiddlewareService = NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE);
-
         //  ---------------------------------- Start Vault Deployment ----------------------------------
-        vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
 
+        // ------------------------------- Start Global Receiver Deployment -------------------------------
         iBTC_globalReceiver = new iBTC_GlobalReceiver();
         iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
+        // ------------------------------- End Global Receiver Deployment -------------------------------
+
+        // ------------------------------- Start Vault Configurator Deployment -------------------------------
+        vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
+        // ------------------------------- End   Vault Configurator Deployment -------------------------------
+
+        // ------------------------------- Start Burner Deployment -------------------------------
         // burner setup
         IBurnerRouter.InitParams memory params = IBurnerRouter.InitParams({
             owner: OWNER,
@@ -114,7 +116,6 @@ contract DeployAll is Script {
         BurnerRouterFactory burnerRouterFactory = new BurnerRouterFactory(address(burnerTemplate));
         address burnerAddress = address(burnerRouterFactory.create(params));
         burner = BurnerRouter(burnerAddress);
-        (,, address deployer) = vm.readCallers();
 
         // Vault setup
         bytes memory vaultParams = abi.encode(
@@ -185,9 +186,6 @@ contract DeployAll is Script {
         //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         // }
 
-        console2.log("Vault: ", vault_);
-        console2.log("Delegator: ", delegator_);
-        console2.log("Slasher: ", slasher_);
         iBTC_vault = iBTC_Vault(vault_);
 
         // ---------------------------------- End Vault Deployment ----------------------------------
@@ -195,10 +193,6 @@ contract DeployAll is Script {
         // --------------------------- Start NetworkMiddleware Deployment ---------------------------
         NetworkMock networkMock = new NetworkMock();
         NETWORK = address(networkMock);
-        console2.log("NETWORK: ", NETWORK);
-        networkMock.registerSubnetwork(0);
-        network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
-        vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
         address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
             IDefaultStakerRewards.InitParams({
                 vault: address(iBTC_vault),
@@ -216,7 +210,6 @@ contract DeployAll is Script {
         REWARD_TOKEN = address(rewardToken);
         defaultStakerRewards = DefaultStakerRewards(STAKER_REWARDS);
         defaultOperatorRewards = DefaultOperatorRewards(OPERATOR_REWARDS);
-        // --------------------------- End NetworkMiddleware Deployment ---------------------------
 
         iBTC_networkMiddleware = new NetworkMiddleware(
             NETWORK,
@@ -233,18 +226,29 @@ contract DeployAll is Script {
             threshold,
             minimumThreshold
         );
+        // --------------------------- End NetworkMiddleware Deployment ---------------------------
+
+        console2.log("Vault: ", vault_);
+        console2.log("Delegator: ", delegator_);
+        console2.log("Slasher: ", slasher_);
+        console2.log("iBTC_GlobalReceiver: ", address(iBTC_globalReceiver));
+        console2.log("NETWORK: ", NETWORK);
+        console2.log("DefaultStakerRewards: ", STAKER_REWARDS);
+        console2.log("DefaultOperatorRewards: ", OPERATOR_REWARDS);
+        console2.log("RewardToken: ", REWARD_TOKEN);
         console2.log("NetworkMiddleware: ", address(iBTC_networkMiddleware));
-        _registerNetwork(address(iBTC_networkMiddleware));
+        // _registerNetworkMiddleware(address(iBTC_networkMiddleware));
 
         // ------------------------ End NetworkMiddleware Deployment -------------------------
 
         vm.stopBroadcast();
     }
 
-    function _registerNetwork(
-        address middleware
-    ) internal {
-        NetworkMock(NETWORK).registerInRegistry(networkRegistry);
-        networkMiddlewareService.setMiddleware(middleware);
-    }
+    // function _registerNetworkMiddleware(
+    //     address middleware
+    // ) internal {
+    //     NetworkMock(NETWORK).registerInRegistry(NETWORK_REGISTRY);
+
+    //     NetworkMock(NETWORK).setMiddleware(NETWORK_MIDDLEWARE_SERVICE, middleware);
+    // }
 }

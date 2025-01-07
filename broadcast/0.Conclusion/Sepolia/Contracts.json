@@ -1,0 +1,14 @@
+{
+    "Contracts": {
+        "NetworkMiddleware": "0xeC8Bd83B7049B961c432a188B77D58AfC7F43e18",
+        "Vault": "0x752bE6f54dd71c31ef69C0C3D058a7b4Cd63fE50",
+        "Delegator": "0x0256d570e888f0a49109aB6e09779996db0B225E",
+        "Slasher": "0x82591E38497cFbDa4767f8bb86843BFC62C41ae9",
+        "iBTC_globalReceiver": "0x3050073e42748419EA2102C2Fd10088ccCAc29Ba",
+        "VaultConfigurator": "0x8ec40e00c41E939e1EF941c1661b34eF7F6E93F0",
+        "BurnerRouter": "0x1941F991b8a813225D49878D932ffDC2e7087483",
+        "NetworkMock": "0xEf85be362826B0dE777879877457985115ca6BD2",
+        "DefaultStakerRewards": "0x6679eb0e0958Fd2e28BACAa7d9e5693c525cDc6D",
+        "DefaultOperatorRewards": "0x4417dB47b51E7802446C9E0A3E2F64e0Cb485A99"
+    }
+}
