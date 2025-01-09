@@ -13,7 +13,6 @@ import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
 import {IBaseDelegator} from "@symbiotic/interfaces/delegator/IBaseDelegator.sol";
 import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
 import {IOptInService} from "@symbiotic/interfaces/service/IOptInService.sol";
-import {IEntity} from "@symbiotic/interfaces/common/IEntity.sol";
 import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -28,6 +27,12 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using SafeERC20 for IERC20;
     using Subnetwork for address;
+
+    error ZeroOwner();
+    error ZeroNetwork();
+    error ZeroOperatorRegistry();
+    error ZeroVaultRegistry();
+    error ZeroOperatorNetOptin();
 
     error NotOperator();
     error NotVault();
@@ -70,7 +75,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
 
     address public immutable NETWORK;
     address public immutable OPERATOR_REGISTRY;
-    address public immutable NETWORK_REGISTRY;
     address public immutable VAULT_REGISTRY;
     address public immutable OPERATOR_NET_OPTIN;
     address public immutable OPERATOR_VAULT_OPTIN;
@@ -109,7 +113,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     constructor(
         address _network,
         address _operatorRegistry,
-        address _networkRegistry,
         address _vaultRegistry,
         address _operatorNetOptin,
         address _owner,
@@ -125,6 +128,26 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
             revert SlashingWindowTooShort();
         }
 
+        if (_network == address(0)) {
+            revert ZeroNetwork();
+        }
+
+        if (_operatorRegistry == address(0)) {
+            revert ZeroOperatorRegistry();
+        }
+
+        if (_vaultRegistry == address(0)) {
+            revert ZeroVaultRegistry();
+        }
+
+        if (_operatorNetOptin == address(0)) {
+            revert ZeroOperatorNetOptin();
+        }
+
+        if (_owner == address(0)) {
+            revert ZeroOwner();
+        }
+
         START_TIME = Time.timestamp();
         EPOCH_DURATION = _epochDuration;
         NETWORK = _network;
@@ -133,7 +156,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         OPERATOR_REWARDS = _operatorReward;
         REWARD_TOKEN = _rewardToken;
         OPERATOR_REGISTRY = _operatorRegistry;
-        NETWORK_REGISTRY = _networkRegistry;
         VAULT_REGISTRY = _vaultRegistry;
         OPERATOR_NET_OPTIN = _operatorNetOptin;
         SLASHING_WINDOW = _slashingWindow;
@@ -451,6 +473,7 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
+        //TODO: Calculate the cumulative reward amount
 
         if (totalStake == 0) {
             revert ZeroTotalStake();
@@ -478,6 +501,8 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         uint256 distributeAmount,
         bytes32 merkleRoot
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+
+        //TODO: Calculate the cumulative reward amount
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }

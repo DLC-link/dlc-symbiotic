@@ -296,7 +296,6 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         iBTC_networkMiddleware = new NetworkMiddleware(
             NETWORK,
             OPERATOR_REGISTRY,
-            NETWORK_REGISTRY,
             VAULT_FACTORY,
             NEWTORK_OPTIN_SERVICE,
             OWNER,
