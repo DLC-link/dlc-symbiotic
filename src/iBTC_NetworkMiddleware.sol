@@ -33,6 +33,11 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     error ZeroOperatorRegistry();
     error ZeroVaultRegistry();
     error ZeroOperatorNetOptin();
+    error ZeroStakerReward();
+    error ZeroOperatorReward();
+    error ZeroRewardToken();
+    error ZeroEpochDuration();
+    error ZeroSlashingWindow();
 
     error NotOperator();
     error NotVault();
@@ -124,28 +129,23 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         uint16 _threshold,
         uint16 _minimumThreshold
     ) SimpleKeyRegistry32() MultisigValidated(_owner, _minimumThreshold, _threshold) {
+        _checkNonZeroAddress(_network, "ZeroNetwork");
+        _checkNonZeroAddress(_operatorRegistry, "ZeroOperatorRegistry");
+        _checkNonZeroAddress(_vaultRegistry, "ZeroVaultRegistry");
+        _checkNonZeroAddress(_operatorNetOptin, "ZeroOperatorNetOptin");
+        _checkNonZeroAddress(_owner, "ZeroOwner");
+        _checkNonZeroAddress(_stakerReward, "ZeroStakerReward");
+        _checkNonZeroAddress(_operatorReward, "ZeroOperatorReward");
+        _checkNonZeroAddress(_rewardToken, "ZeroRewardToken");
+
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
-
-        if (_network == address(0)) {
-            revert ZeroNetwork();
+        if (_epochDuration == 0) {
+            revert ZeroEpochDuration();
         }
-
-        if (_operatorRegistry == address(0)) {
-            revert ZeroOperatorRegistry();
-        }
-
-        if (_vaultRegistry == address(0)) {
-            revert ZeroVaultRegistry();
-        }
-
-        if (_operatorNetOptin == address(0)) {
-            revert ZeroOperatorNetOptin();
-        }
-
-        if (_owner == address(0)) {
-            revert ZeroOwner();
+        if (_slashingWindow == 0) {
+            revert ZeroSlashingWindow();
         }
 
         START_TIME = Time.timestamp();
@@ -501,7 +501,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
         uint256 distributeAmount,
         bytes32 merkleRoot
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
-
         //TODO: Calculate the cumulative reward amount
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
@@ -544,6 +543,12 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
 
     function _wasActiveAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
+    }
+
+    function _checkNonZeroAddress(address addr, string memory errorMessage) private pure {
+        if (addr == address(0)) {
+            revert(errorMessage);
+        }
     }
 
     function _slashVault(
