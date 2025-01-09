@@ -32,8 +32,6 @@ contract NetworkMiddleware is SimpleKeyRegistry32, Ownable, MultisigValidated {
     error ZeroNetwork();
     error ZeroOperatorRegistry();
     error ZeroVaultRegistry();
-    error ZeroOperatorNetOptin();
-    error ZeroStakerReward();
     error ZeroOperatorReward();
     error ZeroRewardToken();
     error ZeroEpochDuration();
