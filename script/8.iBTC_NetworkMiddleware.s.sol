@@ -2,6 +2,10 @@ pragma solidity 0.8.25;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {NetworkMiddleware} from "../src/iBTC_NetworkMiddleware.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract DeployNetworkMiddleware is Script {
     address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
@@ -25,23 +29,47 @@ contract DeployNetworkMiddleware is Script {
     uint16 constant threshold = 2; // for test case
     uint16 constant minimumThreshold = 2;
 
+    ProxyAdmin private proxyAdmin;
+    TransparentUpgradeableProxy private proxy;
+    NetworkMiddleware private iBTC_networkMiddleware;
+
     function run(address NETWORK, address STAKER_REWARDS, address OPERATOR_REWARDS, address REWARD_TOKEN) external {
         vm.startBroadcast();
-        NetworkMiddleware iBTC_networkMiddleware = new NetworkMiddleware(
-            NETWORK,
-            OPERATOR_REGISTRY,
-            VAULT_FACTORY,
-            NEWTORK_OPTIN_SERVICE,
+        NetworkMiddleware implementation = new NetworkMiddleware();
+        proxy = new TransparentUpgradeableProxy(
+            address(implementation),
             OWNER,
-            STAKER_REWARDS,
-            OPERATOR_REWARDS,
-            REWARD_TOKEN,
-            NETWORK_EPOCH,
-            SLASHING_WINDOW,
-            threshold,
-            minimumThreshold
+            abi.encodeWithSelector(
+                NetworkMiddleware.initialize.selector,
+                NETWORK,
+                OPERATOR_REGISTRY,
+                VAULT_FACTORY,
+                NEWTORK_OPTIN_SERVICE,
+                OWNER,
+                STAKER_REWARDS,
+                OPERATOR_REWARDS,
+                REWARD_TOKEN,
+                NETWORK_EPOCH,
+                SLASHING_WINDOW,
+                threshold,
+                minimumThreshold
+            )
         );
+        proxyAdmin = ProxyAdmin(_getAdminAddress(address(proxy)));
+        iBTC_networkMiddleware = NetworkMiddleware(address(proxy));
+
         console2.log("NetworkMiddleware deployed at:", address(iBTC_networkMiddleware));
+        console2.log("ProxyAdmin deployed at:", address(proxyAdmin));
         vm.stopBroadcast();
+    }
+
+    function _getAdminAddress(
+        address proxy_
+    ) internal view returns (address) {
+        address CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
+        Vm vm = Vm(CHEATCODE_ADDRESS);
+
+        bytes32 adminSlot = vm.load(proxy_, ERC1967Utils.ADMIN_SLOT);
+        return address(uint160(uint256(adminSlot)));
     }
 }

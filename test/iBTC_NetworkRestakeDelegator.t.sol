@@ -25,6 +25,9 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
 import {IVault} from "core/src/interfaces/vault/IVault.sol";
 import {IBurnerRouter} from "burners/src/interfaces/router/IBurnerRouter.sol";
@@ -75,6 +78,7 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
     bytes32 public constant OPERATOR_NETWORK_SHARES_SET_ROLE = keccak256("OPERATOR_NETWORK_SHARES_SET_ROLE");
     bytes32 public constant ADMIN_FEE_SET_ROLE = keccak256("ADMIN_FEE_SET_ROLE");
     bytes32 public constant ADMIN_FEE_CLAIM_ROLE = keccak256("ADMIN_FEE_CLAIM_ROLE");
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
     address NETWORK; // address network should be a multisig contract
@@ -151,6 +155,9 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
     event ClaimRewards(
         address recipient, address indexed network, address indexed token, address indexed claimer, uint256 amount
     );
+
+    ProxyAdmin private proxyAdmin;
+    TransparentUpgradeableProxy private proxy;
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
@@ -293,20 +300,28 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
 
         vaults.push(vault_);
         vm.startPrank(OWNER);
-        iBTC_networkMiddleware = new NetworkMiddleware(
-            NETWORK,
-            OPERATOR_REGISTRY,
-            VAULT_FACTORY,
-            NEWTORK_OPTIN_SERVICE,
+        NetworkMiddleware implementation = new NetworkMiddleware();
+        proxy = new TransparentUpgradeableProxy(
+            address(implementation),
             OWNER,
-            STAKER_REWARDS,
-            OPERATOR_REWARDS,
-            REWARD_TOKEN,
-            NETWORK_EPOCH,
-            SLASHING_WINDOW,
-            threshold,
-            minimumThreshold
+            abi.encodeWithSelector(
+                NetworkMiddleware.initialize.selector,
+                NETWORK,
+                OPERATOR_REGISTRY,
+                VAULT_FACTORY,
+                NEWTORK_OPTIN_SERVICE,
+                OWNER,
+                STAKER_REWARDS,
+                OPERATOR_REWARDS,
+                REWARD_TOKEN,
+                NETWORK_EPOCH,
+                SLASHING_WINDOW,
+                threshold,
+                minimumThreshold
+            )
         );
+        proxyAdmin = ProxyAdmin(_getAdminAddress(address(proxy)));
+        iBTC_networkMiddleware = NetworkMiddleware(address(proxy));
         console.log(Time.timestamp(), "Start Time");
 
         vm.stopPrank();
@@ -762,5 +777,15 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         vm.warp(captureTimestamp + 3 days);
         slashAmount = iBTC_slasher.executeSlash(slashIndex, "");
         vm.stopPrank();
+    }
+
+    function _getAdminAddress(
+        address proxy_
+    ) internal view returns (address) {
+        address CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
+        Vm vm = Vm(CHEATCODE_ADDRESS);
+
+        bytes32 adminSlot = vm.load(proxy_, ERC1967Utils.ADMIN_SLOT);
+        return address(uint160(uint256(adminSlot)));
     }
 }

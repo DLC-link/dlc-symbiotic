@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-contract MultisigValidated is Ownable, AccessControl {
+contract MultisigValidated is Initializable, OwnableUpgradeable, AccessControlUpgradeable {
     bytes32 public constant APPROVED_SIGNER = keccak256("APPROVED_SIGNER");
 
     uint16 private _minimumThreshold;
     uint16 private _threshold;
     uint16 private _signerCount;
 
-    // Track seen signers to prevent duplicate signatures
     mapping(address => mapping(bytes32 => bool)) private _seenSigners;
 
     error NotEnoughSignatures();
@@ -26,7 +26,14 @@ contract MultisigValidated is Ownable, AccessControl {
 
     event SetThreshold(uint16 newThreshold);
 
-    constructor(address initialOwner, uint16 minimumThreshold, uint16 threshold) Ownable(initialOwner) {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address initialOwner, uint16 minimumThreshold, uint16 threshold) public initializer {
+        __Ownable_init(initialOwner);
+        __AccessControl_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
 
         require(minimumThreshold > 0, "Minimum threshold must be greater than 0");

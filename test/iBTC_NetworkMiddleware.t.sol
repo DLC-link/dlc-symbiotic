@@ -22,6 +22,10 @@ import {NetworkMock} from "./mocks/NetworkMock.sol";
 import {DefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewards.sol";
 import {DefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
 import {VaultHints} from "@symbioticfi/core/src/contracts/hints/VaultHints.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
@@ -43,8 +47,10 @@ import {IDefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/
 import {IDefaultOperatorRewardsFactory} from
     "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewardsFactory.sol";
 import {IDefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBTC} from "test/mocks/iBTCMock.sol";
 import {RewardTokenMock} from "test/mocks/RewardTokenMock.sol";
+import {NetworkMiddlewareV2} from "test/mocks/iBTC_NetworkMiddlwareV2Mock.sol";
 
 contract iBTC_NetworkMiddlewareTest is Test {
     using Math for uint256;
@@ -79,6 +85,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     bytes32 public constant OPERATOR_NETWORK_SHARES_SET_ROLE = keccak256("OPERATOR_NETWORK_SHARES_SET_ROLE");
     bytes32 public constant ADMIN_FEE_SET_ROLE = keccak256("ADMIN_FEE_SET_ROLE");
     bytes32 public constant ADMIN_FEE_CLAIM_ROLE = keccak256("ADMIN_FEE_CLAIM_ROLE");
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
     address NETWORK; // address network should be a multisig contract
@@ -98,7 +105,8 @@ contract iBTC_NetworkMiddlewareTest is Test {
     uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
     uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for executing a slashing request.
     uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
-
+    uint16 threshold = 2; // for test case
+    uint16 minimumThreshold = 2;
     EnumerableMap.AddressToUintMap operators;
 
     bytes32[] keys;
@@ -156,6 +164,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         address recipient, address indexed network, address indexed token, address indexed claimer, uint256 amount
     );
 
+    ProxyAdmin private proxyAdmin;
+    TransparentUpgradeableProxy private proxy;
+
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
         (alice, alicePrivateKey) = makeAddrAndKey("alice");
@@ -178,8 +189,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint64 delegatorIndex = 0;
         uint64 slasherIndex = 1;
         bool withSlasher = true;
-        uint16 threshold = 2; // for test case
-        uint16 minimumThreshold = 2;
+
         vm.startPrank(OWNER);
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
@@ -297,20 +307,28 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
         vaults.push(vault_);
         vm.startPrank(OWNER);
-        iBTC_networkMiddleware = new NetworkMiddleware(
-            NETWORK,
-            OPERATOR_REGISTRY,
-            VAULT_FACTORY,
-            NEWTORK_OPTIN_SERVICE,
+        NetworkMiddleware implementation = new NetworkMiddleware();
+        proxy = new TransparentUpgradeableProxy(
+            address(implementation),
             OWNER,
-            STAKER_REWARDS,
-            OPERATOR_REWARDS,
-            REWARD_TOKEN,
-            NETWORK_EPOCH,
-            SLASHING_WINDOW,
-            threshold,
-            minimumThreshold
+            abi.encodeWithSelector(
+                NetworkMiddleware.initialize.selector,
+                NETWORK,
+                OPERATOR_REGISTRY,
+                VAULT_FACTORY,
+                NEWTORK_OPTIN_SERVICE,
+                OWNER,
+                STAKER_REWARDS,
+                OPERATOR_REWARDS,
+                REWARD_TOKEN,
+                NETWORK_EPOCH,
+                SLASHING_WINDOW,
+                threshold,
+                minimumThreshold
+            )
         );
+        proxyAdmin = ProxyAdmin(_getAdminAddress(address(proxy)));
+        iBTC_networkMiddleware = NetworkMiddleware(address(proxy));
         console.log(Time.timestamp(), "Start Time");
 
         vm.stopPrank();
@@ -686,6 +704,25 @@ contract iBTC_NetworkMiddlewareTest is Test {
         assertEq(rewardToken.balanceOf(alice), claimableAmount, "claimable amount should be right");
     }
 
+    function testUpgrade() public {
+        // Deploy the new implementation
+        NetworkMiddlewareV2 newImplementation = new NetworkMiddlewareV2();
+
+        vm.startPrank(OWNER);
+        proxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation), "");
+        vm.stopPrank();
+
+        NetworkMiddlewareV2 upgradedContract = NetworkMiddlewareV2(address(proxy));
+
+        assertEq(
+            upgradedContract.getCurrentEpoch(),
+            iBTC_networkMiddleware.getCurrentEpoch(),
+            "Epoch should be the same after upgrade"
+        );
+
+        assertEq(upgradedContract.getTestVar(), 1e4, "The testVar should be initialized correctly");
+    }
+
     function _makeSignatures(
         uint256 slashIndex,
         uint48 epoch,
@@ -789,7 +826,17 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     function _setOperatorNetworkShares(address user, address network_, address operator, uint256 shares) internal {
         vm.startPrank(user);
-        iBTC_delegator.setOperatorNetworkShares(network.subnetwork(0), operator, shares);
+        iBTC_delegator.setOperatorNetworkShares(network_.subnetwork(0), operator, shares);
         vm.stopPrank();
+    }
+
+    function _getAdminAddress(
+        address proxy_
+    ) internal view returns (address) {
+        address CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
+        Vm vm = Vm(CHEATCODE_ADDRESS);
+
+        bytes32 adminSlot = vm.load(proxy_, ERC1967Utils.ADMIN_SLOT);
+        return address(uint160(uint256(adminSlot)));
     }
 }
