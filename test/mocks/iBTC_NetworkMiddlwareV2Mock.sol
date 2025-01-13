@@ -5,11 +5,10 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {MultisigValidated} from "./libraries/MultisigValidated.sol";
-import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
-import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
+import {MultisigValidated} from "src/libraries/MultisigValidated.sol";
+import {SimpleKeyRegistry32} from "src/libraries/SimpleKeyRegistry32.sol";
+import {MapWithTimeData} from "src/libraries/MapWithTimeData.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IDefaultOperatorRewards} from "rewards/src/interfaces/defaultOperatorRewards/IDefaultOperatorRewards.sol";
 import {IDefaultStakerRewards} from "rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
@@ -24,7 +23,7 @@ import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
-contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgradeable, MultisigValidated {
+contract NetworkMiddlewareV2 is Initializable, SimpleKeyRegistry32, OwnableUpgradeable, MultisigValidated {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using SafeERC20 for IERC20;
@@ -108,7 +107,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
     EnumerableMap.AddressToUintMap private operators;
     EnumerableMap.AddressToUintMap private vaults;
-
     uint256[50] __gap;
 
     ////////////////////////////////////////////////////////////////
@@ -117,9 +115,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
     event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
 
-    ////////////////////////////////////////////////////////////////
-    //                        MODIFIERS                          //
-    ////////////////////////////////////////////////////////////////
     modifier updateStakeCache(
         uint48 epoch
     ) {
@@ -188,6 +183,10 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint48 epoch
     ) public view returns (uint48 timestamp) {
         return START_TIME + epoch * EPOCH_DURATION;
+    }
+
+    function getTestVar() public pure returns (uint256) {
+        return 1e4;
     }
 
     function getEpochAtTs(

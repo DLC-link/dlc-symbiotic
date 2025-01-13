@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  FOUNDRY_PROFILE: ci
+  FOUNDRY_PROFILE: default
   SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
 
 jobs:
@@ -23,8 +23,6 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
 
       - name: Show Forge version
         run: |

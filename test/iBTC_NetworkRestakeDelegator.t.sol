@@ -17,11 +17,17 @@ import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFact
 import {MetadataService} from "core/test/service/MetadataService.t.sol";
 import {BaseDelegatorHints} from "lib/burners/lib/core/src/contracts/hints/DelegatorHints.sol";
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
-
+import {iBTC_GlobalReceiver} from "src/iBTC_GlobalReceiver.sol";
+import {NetworkMock} from "./mocks/NetworkMock.sol";
+import {DefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewards.sol";
+import {DefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MapWithTimeData} from "../src/libraries/MapWithTimeData.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
 import {IVault} from "core/src/interfaces/vault/IVault.sol";
 import {IBurnerRouter} from "burners/src/interfaces/router/IBurnerRouter.sol";
@@ -32,8 +38,14 @@ import {IBaseSlasher} from "core/src/interfaces/slasher/IBaseSlasher.sol";
 import {IVaultConfigurator} from "core/src/interfaces/IVaultConfigurator.sol";
 import {IRegistry} from "core/src/interfaces/common/IRegistry.sol";
 import {IBTC} from "test/mocks/iBTCMock.sol";
+import {RewardTokenMock} from "test/mocks/RewardTokenMock.sol";
+import {IDefaultStakerRewardsFactory} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewardsFactory.sol";
+import {IDefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewards.sol";
+import {IDefaultOperatorRewardsFactory} from
+    "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewardsFactory.sol";
+import {IDefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
 
-contract iBTC_NetworkMiddlewareTest is Test {
+contract iBTC_NetworkRestakeDelegatorTest is Test {
     using Math for uint256;
     using Subnetwork for bytes32;
     using Subnetwork for address;
@@ -42,10 +54,12 @@ contract iBTC_NetworkMiddlewareTest is Test {
 
     uint256 sepoliaFork;
     string SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
+
+    // sepolia
     address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
     address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
-    address constant COLLATTERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
+    address constant COLLATERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
     address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4;
     address constant DELEGATOR_FACTORY = 0x890CA3f95E0f40a79885B7400926544B2214B03f;
     address constant SLASHER_FACTORY = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
@@ -53,15 +67,24 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address constant VAULT_OPTIN_SERVICE = 0x95CC0a052ae33941877c9619835A233D21D57351;
     address constant OPERATOR_METADATA_SERVICE = 0x0999048aB8eeAfa053bF8581D4Aa451ab45755c9;
     address constant NETWORK_METADATA_SERVICE = 0x0F7E58Cc4eA615E8B8BEB080dF8B8FDB63C21496;
+    address constant DEFAULT_STAKER_REWARDS_FACTORY = 0x70C618a13D1A57f7234c0b893b9e28C5cA8E7f37;
+    address constant DEFAULT_OPERATOR_REWARDS_FACTORY = 0x8D6C873cb7ffa6BE615cE1D55801a9417Ed55f9B;
     uint256 constant MAX_WITHDRAW_AMOUNT = 1e9;
     uint256 constant MIN_WITHDRAW_AMOUNT = 1e4;
+    uint256 constant ADMIN_FEE_BASE = 1e4;
 
+    bytes32 public constant APPROVED_SIGNER = keccak256("APPROVED_SIGNER");
     bytes32 public constant NETWORK_LIMIT_SET_ROLE = keccak256("NETWORK_LIMIT_SET_ROLE");
     bytes32 public constant OPERATOR_NETWORK_SHARES_SET_ROLE = keccak256("OPERATOR_NETWORK_SHARES_SET_ROLE");
+    bytes32 public constant ADMIN_FEE_SET_ROLE = keccak256("ADMIN_FEE_SET_ROLE");
+    bytes32 public constant ADMIN_FEE_CLAIM_ROLE = keccak256("ADMIN_FEE_CLAIM_ROLE");
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
-    address constant NETWORK = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266; // first address network should be a multisig contract
     address constant OWNER = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8; // second address
-    address constant GLOBAL_RECEIVER = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; //NOTE third address
+    address NETWORK; // address network should be a multisig contract
+    address STAKER_REWARDS;
+    address OPERATOR_REWARDS;
+    address REWARD_TOKEN;
 
     /*
     Rules:
@@ -107,8 +130,34 @@ contract iBTC_NetworkMiddlewareTest is Test {
     NetworkMiddleware networkmiddleware;
     IBTC iBTC;
     VetoSlasher iBTC_slasher;
+    iBTC_GlobalReceiver iBTC_globalReceiver;
+    NetworkMock public network;
+    DefaultStakerRewards public defaultStakerRewards;
+    DefaultOperatorRewards public defaultOperatorRewards;
+    RewardTokenMock public rewardToken;
 
     event VetoSlash(uint256 indexed slashIndex, address indexed resolver);
+    event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
+    event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
+
+    // staker rewards
+    event ClaimRewards(
+        address indexed token,
+        address indexed network,
+        address indexed claimer,
+        address recipient,
+        uint256 firstRewardIndex,
+        uint256 numRewards,
+        uint256 amount
+    );
+
+    // operator rewards
+    event ClaimRewards(
+        address recipient, address indexed network, address indexed token, address indexed claimer, uint256 amount
+    );
+
+    ProxyAdmin private proxyAdmin;
+    TransparentUpgradeableProxy private proxy;
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
@@ -116,10 +165,13 @@ contract iBTC_NetworkMiddlewareTest is Test {
         (bob, bobPrivateKey) = makeAddrAndKey("bob");
         (approvedSigner1, approvedSigner1Key) = makeAddrAndKey("approvedSigner1");
         (approvedSigner2, approvedSigner2Key) = makeAddrAndKey("approvedSigner2");
+        network = new NetworkMock();
+        NETWORK = address(network);
+        network.registerSubnetwork(0);
         networkRegistry = NetworkRegistry(NETWORK_REGISTRY);
         networkMiddlewareService = NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE);
         operatorRegistry = OperatorRegistry(OPERATOR_REGISTRY);
-        iBTC = IBTC(COLLATTERAL);
+        iBTC = IBTC(COLLATERAL);
         operatorMetadataService = new MetadataService(OPERATOR_METADATA_SERVICE);
         networkMetadataService = new MetadataService(NETWORK_METADATA_SERVICE);
         address[] memory whitelistedDepositors;
@@ -134,14 +186,18 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
+        //  create Global Receiver
+        iBTC_globalReceiver = new iBTC_GlobalReceiver();
+        iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
 
+        // create Burner Router
         IBurnerRouter.NetworkReceiver[] memory networkReceiver;
         IBurnerRouter.OperatorNetworkReceiver[] memory operatorNetworkReceiver;
         IBurnerRouter.InitParams memory params = IBurnerRouter.InitParams({
             owner: OWNER,
-            collateral: COLLATTERAL,
+            collateral: COLLATERAL,
             delay: 0, //NOTE we can set a delay
-            globalReceiver: GLOBAL_RECEIVER,
+            globalReceiver: address(iBTC_globalReceiver),
             networkReceivers: networkReceiver,
             operatorNetworkReceivers: operatorNetworkReceiver
         });
@@ -149,14 +205,14 @@ contract iBTC_NetworkMiddlewareTest is Test {
         BurnerRouterFactory burnerRouterFactory = new BurnerRouterFactory(address(burnerTemplate));
         address burnerAddress = address(burnerRouterFactory.create(params));
         burner = BurnerRouter(burnerAddress);
-        assertEq(burner.collateral(), COLLATTERAL, "Burner Router should be setting correctly");
+        assertEq(burner.collateral(), COLLATERAL, "Burner Router should be setting correctly");
         (,, address deployer) = vm.readCallers();
 
         bool depositWhitelist = whitelistedDepositors.length != 0;
 
         bytes memory vaultParams = abi.encode(
             IVault.InitParams({
-                collateral: COLLATTERAL,
+                collateral: COLLATERAL,
                 burner: address(burner),
                 epochDuration: VAULT_EPOCH_DURATION,
                 depositWhitelist: depositWhitelist,
@@ -217,28 +273,56 @@ contract iBTC_NetworkMiddlewareTest is Test {
             iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         }
         vm.stopPrank();
-        iBTC_delegator = NetworkRestakeDelegator(delegator_);
+        // ------------ End Vault Deployment ------------------
         iBTC_vault = iBTC_Vault(vault_);
+
+        address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
+            IDefaultStakerRewards.InitParams({
+                vault: address(iBTC_vault),
+                adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
+                defaultAdminRoleHolder: OWNER, // address of the main admin (can manage all roles)
+                adminFeeClaimRoleHolder: OWNER, // address of the admin fee claimer
+                adminFeeSetRoleHolder: OWNER // address of the admin fee setter
+            })
+        );
+        address defaultOperatorRewards_ = IDefaultOperatorRewardsFactory(DEFAULT_OPERATOR_REWARDS_FACTORY).create();
+        rewardToken = new RewardTokenMock("reward", "REWARD", 100e18);
+
+        STAKER_REWARDS = address(defaultStakerRewards_);
+        OPERATOR_REWARDS = address(defaultOperatorRewards_);
+        REWARD_TOKEN = address(rewardToken);
+        defaultStakerRewards = DefaultStakerRewards(STAKER_REWARDS);
+        defaultOperatorRewards = DefaultOperatorRewards(OPERATOR_REWARDS);
+
+        iBTC_delegator = NetworkRestakeDelegator(delegator_);
         network_optIn_service = OptInService(NEWTORK_OPTIN_SERVICE);
         vault_optIn_service = OptInService(VAULT_OPTIN_SERVICE);
-        //NOTICE
-        // vm.prank(vault_);
-        // NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
 
         vaults.push(vault_);
         vm.startPrank(OWNER);
-        iBTC_networkMiddleware = new NetworkMiddleware(
-            NETWORK,
-            OPERATOR_REGISTRY,
-            NETWORK_REGISTRY,
-            VAULT_FACTORY,
-            NEWTORK_OPTIN_SERVICE,
+        NetworkMiddleware implementation = new NetworkMiddleware();
+        proxy = new TransparentUpgradeableProxy(
+            address(implementation),
             OWNER,
-            NETWORK_EPOCH,
-            SLASHING_WINDOW,
-            threshold,
-            minimumThreshold
+            abi.encodeWithSelector(
+                NetworkMiddleware.initialize.selector,
+                NETWORK,
+                OPERATOR_REGISTRY,
+                VAULT_FACTORY,
+                NEWTORK_OPTIN_SERVICE,
+                OWNER,
+                STAKER_REWARDS,
+                OPERATOR_REWARDS,
+                REWARD_TOKEN,
+                NETWORK_EPOCH,
+                SLASHING_WINDOW,
+                threshold,
+                minimumThreshold
+            )
         );
+        proxyAdmin = ProxyAdmin(_getAdminAddress(address(proxy)));
+        iBTC_networkMiddleware = NetworkMiddleware(address(proxy));
+        console.log(Time.timestamp(), "Start Time");
 
         vm.stopPrank();
         _registerNetwork(NETWORK, address(iBTC_networkMiddleware));
@@ -252,7 +336,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         NetworkRegistry(NETWORK_REGISTRY).registerNetwork();
         NetworkMiddlewareService(NETWORK_MIDDLEWARE_SERVICE).setMiddleware(address(iBTC_networkMiddleware));
         vm.stopPrank();
-        _setResolver(0, bob);
     }
 
     function test_SetNetworkLimit() public {
@@ -498,7 +581,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         uint256 operatorNetworkShares1 = 1e10;
         uint256 operatorNetworkShares2 = 5e9;
         uint256 slashAmount1 = 1e10;
-        uint256 slashAmount2 = 4e9;
 
         uint256 blockTimestamp = block.timestamp;
         blockTimestamp = blockTimestamp + 1_720_700_948;
@@ -639,9 +721,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function _optInOperatorNetwork(address user, address network) internal {
+    function _optInOperatorNetwork(address user, address network_) internal {
         vm.startPrank(user);
-        network_optIn_service.optIn(network);
+        network_optIn_service.optIn(network_);
         vm.stopPrank();
     }
 
@@ -668,30 +750,41 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function _setNetworkLimit(address user, address network, uint256 amount) internal {
+    function _setNetworkLimit(address user, address network_, uint256 amount) internal {
         vm.startPrank(user);
-        iBTC_delegator.setNetworkLimit(network.subnetwork(0), amount);
+        iBTC_delegator.setNetworkLimit(network_.subnetwork(0), amount);
         vm.stopPrank();
     }
 
-    function _setOperatorNetworkShares(address user, address network, address operator, uint256 shares) internal {
+    function _setOperatorNetworkShares(address user, address network_, address operator, uint256 shares) internal {
         vm.startPrank(user);
-        iBTC_delegator.setOperatorNetworkShares(network.subnetwork(0), operator, shares);
+        iBTC_delegator.setOperatorNetworkShares(network_.subnetwork(0), operator, shares);
         vm.stopPrank();
     }
 
     function _slash(
         address networkMiddleware,
-        address network,
+        address network_,
         address operator,
         uint256 amount,
         uint48 captureTimestamp,
         bytes memory hints
     ) internal returns (uint256 slashAmount) {
         vm.startPrank(networkMiddleware);
-        uint256 slashIndex = iBTC_slasher.requestSlash(network.subnetwork(0), operator, amount, captureTimestamp, hints);
+        uint256 slashIndex =
+            iBTC_slasher.requestSlash(network_.subnetwork(0), operator, amount, captureTimestamp, hints);
         vm.warp(captureTimestamp + 3 days);
         slashAmount = iBTC_slasher.executeSlash(slashIndex, "");
         vm.stopPrank();
+    }
+
+    function _getAdminAddress(
+        address proxy_
+    ) internal view returns (address) {
+        address CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
+        Vm vm = Vm(CHEATCODE_ADDRESS);
+
+        bytes32 adminSlot = vm.load(proxy_, ERC1967Utils.ADMIN_SLOT);
+        return address(uint160(uint256(adminSlot)));
     }
 }
