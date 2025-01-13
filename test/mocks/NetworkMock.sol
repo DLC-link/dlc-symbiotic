@@ -27,34 +27,34 @@ contract NetworkMock {
     }
 
     function registerSubnetwork(
-        uint96 identifier
+        uint96 identifier_
     ) external returns (bytes32) {
-        bytes32 subnetworkId = address(this).subnetwork(identifier);
+        bytes32 subnetworkId = address(this).subnetwork(identifier_);
         require(!_registeredSubnetworks[subnetworkId], "NetworkMock: subnetwork already registered");
 
-        _subnetworks[identifier] = subnetworkId;
+        _subnetworks[identifier_] = subnetworkId;
         _registeredSubnetworks[subnetworkId] = true;
 
-        emit SubnetworkRegistered(identifier, subnetworkId);
+        emit SubnetworkRegistered(identifier_, subnetworkId);
         return subnetworkId;
     }
 
     function unregisterSubnetwork(
-        uint96 identifier
+        uint96 identifier_
     ) external {
-        bytes32 subnetworkId = _subnetworks[identifier];
+        bytes32 subnetworkId = _subnetworks[identifier_];
         require(_registeredSubnetworks[subnetworkId], "NetworkMock: subnetwork not registered");
 
-        delete _subnetworks[identifier];
+        delete _subnetworks[identifier_];
         delete _registeredSubnetworks[subnetworkId];
 
-        emit SubnetworkUnregistered(identifier, subnetworkId);
+        emit SubnetworkUnregistered(identifier_, subnetworkId);
     }
 
     function subnetwork(
-        uint96 identifier
+        uint96 identifier_
     ) external view returns (bytes32) {
-        bytes32 subnetworkId = _subnetworks[identifier];
+        bytes32 subnetworkId = _subnetworks[identifier_];
         require(_registeredSubnetworks[subnetworkId], "NetworkMock: subnetwork not registered");
         return subnetworkId;
     }

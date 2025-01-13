@@ -185,7 +185,7 @@ contract NetworkMiddlewareV2 is Initializable, SimpleKeyRegistry32, OwnableUpgra
         return START_TIME + epoch * EPOCH_DURATION;
     }
 
-    function getTestVar() public view returns (uint256) {
+    function getTestVar() public pure returns (uint256) {
         return 1e4;
     }
 

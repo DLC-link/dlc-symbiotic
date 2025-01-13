@@ -609,7 +609,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         rewardToken.mint(address(iBTC_networkMiddleware), distributeAmount);
         vm.stopPrank();
 
-        VaultHints vaultHints = new VaultHints();
+        // VaultHints vaultHints = new VaultHints();
 
         // Record balances before distribution
         uint256 balanceBefore = rewardToken.balanceOf(STAKER_REWARDS);
@@ -746,7 +746,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         return signatures;
     }
 
-    function _signMessage(uint256 signerPrivateKey, bytes32 messageHash) internal returns (bytes memory) {
+    function _signMessage(uint256 signerPrivateKey, bytes32 messageHash) internal pure returns (bytes memory) {
         bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, ethSignedMessageHash);
         return abi.encodePacked(r, s, v);

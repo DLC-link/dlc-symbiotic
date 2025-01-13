@@ -581,7 +581,6 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         uint256 operatorNetworkShares1 = 1e10;
         uint256 operatorNetworkShares2 = 5e9;
         uint256 slashAmount1 = 1e10;
-        uint256 slashAmount2 = 4e9;
 
         uint256 blockTimestamp = block.timestamp;
         blockTimestamp = blockTimestamp + 1_720_700_948;
@@ -722,9 +721,9 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         vm.stopPrank();
     }
 
-    function _optInOperatorNetwork(address user, address network) internal {
+    function _optInOperatorNetwork(address user, address network_) internal {
         vm.startPrank(user);
-        network_optIn_service.optIn(network);
+        network_optIn_service.optIn(network_);
         vm.stopPrank();
     }
 
