@@ -16,7 +16,7 @@ contract MultisigValidated is Initializable, OwnableUpgradeable, AccessControlUp
 
     mapping(address => mapping(bytes32 => bool)) private _seenSigners;
 
-    uint256[50] __gaps;
+    uint256[50] __gap;
 
     error NotEnoughSignatures();
     error InvalidSigner();
