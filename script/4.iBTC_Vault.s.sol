@@ -49,8 +49,6 @@ contract VaultScript is Script {
         uint64 delegatorIndex = 0;
         uint64 slasherIndex = 1;
         bool withSlasher = true;
-        uint16 threshold = 2; // for test case
-        uint16 minimumThreshold = 2;
         vm.startBroadcast();
         (,, address deployer) = vm.readCallers();
 
