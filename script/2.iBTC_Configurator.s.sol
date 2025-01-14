@@ -2,7 +2,8 @@
 pragma solidity 0.8.25;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {VaultConfigurator} from "../src/iBTC_VaultConfigurator.sol";
+import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
+import {VaultConfigurator} from "core/src/contracts/VaultConfigurator.sol";
 import {VaultFactory} from "@symbiotic/contracts/VaultFactory.sol";
 import {DelegatorFactory} from "@symbiotic/contracts/DelegatorFactory.sol";
 import {SlasherFactory} from "@symbiotic/contracts/SlasherFactory.sol";

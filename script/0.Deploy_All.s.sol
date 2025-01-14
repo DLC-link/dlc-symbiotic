@@ -7,7 +7,6 @@ import {OperatorRegistry} from "core/src/contracts/OperatorRegistry.sol";
 import {NetworkMiddleware} from "../src/iBTC_NetworkMiddleware.sol";
 import {NetworkRestakeDelegator} from "core/src/contracts/delegator/NetworkRestakeDelegator.sol";
 import {OptInService} from "core/src/contracts/service/OptInService.sol";
-import {VaultConfigurator} from "src/iBTC_VaultConfigurator.sol";
 import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
 import {VetoSlasher} from "core/src/contracts/slasher/VetoSlasher.sol";
@@ -17,7 +16,6 @@ import {DefaultStakerRewards} from "rewards/src/contracts/defaultStakerRewards/D
 import {DefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewards.sol";
 import {RewardTokenMock} from "../test/mocks/RewardTokenMock.sol";
 import {NetworkMiddlewareService} from "core/src/contracts/service/NetworkMiddlewareService.sol";
-import {iBTC_Vault} from "src/iBTC_Vault.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
@@ -25,6 +23,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
 import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
+import {VaultConfigurator} from "core/src/contracts/VaultConfigurator.sol";
 import {IBaseDelegator} from "@symbiotic/interfaces/delegator/IBaseDelegator.sol";
 import {INetworkRestakeDelegator} from "@symbiotic/interfaces/delegator/INetworkRestakeDelegator.sol";
 import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
@@ -79,7 +78,6 @@ contract DeployAll is Script {
     NetworkMiddlewareService networkMiddlewareService;
     NetworkMiddleware networkmiddleware;
     VetoSlasher iBTC_slasher;
-    iBTC_Vault public iBTC_vault;
     iBTC_GlobalReceiver iBTC_globalReceiver;
     NetworkMock public network;
     DefaultStakerRewards public defaultStakerRewards;
@@ -181,21 +179,6 @@ contract DeployAll is Script {
             })
         );
 
-        // we don't need to set deposit whitelist for now
-        // if (depositWhitelist) {
-        //     iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), OWNER);
-        //     iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
-
-        //     for (uint256 i; i < whitelistedDepositors.length; ++i) {
-        //         iBTC_Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
-        //     }
-
-        //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
-        //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
-        // }
-
-        iBTC_vault = iBTC_Vault(vault_);
-
         // ---------------------------------- End Vault Deployment ----------------------------------
 
         // --------------------------- Start NetworkMiddleware Deployment ---------------------------
@@ -203,7 +186,7 @@ contract DeployAll is Script {
         NETWORK = address(networkMock);
         address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
             IDefaultStakerRewards.InitParams({
-                vault: address(iBTC_vault),
+                vault: vault_,
                 adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
                 defaultAdminRoleHolder: OWNER, // address of the main admin (can manage all roles)
                 adminFeeClaimRoleHolder: OWNER, // address of the admin fee claimer

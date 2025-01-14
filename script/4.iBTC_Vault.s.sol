@@ -14,8 +14,6 @@ import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
 import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 
-import {iBTC_Vault} from "../src/iBTC_Vault.sol";
-
 contract VaultScript is Script {
     // ------------------------------- contracts on sepolia -------------------------------
     address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
@@ -151,18 +149,6 @@ contract VaultScript is Script {
                 slasherParams: slasherParams
             })
         );
-
-        // if (depositWhitelist) {
-        //     iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), OWNER);
-        //     iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
-
-        //     for (uint256 i; i < whitelistedDepositors.length; ++i) {
-        //         iBTC_Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
-        //     }
-
-        //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
-        //     iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
-        // }
 
         console2.log("Vault: ", vault_);
         console2.log("Delegator: ", delegator_);
