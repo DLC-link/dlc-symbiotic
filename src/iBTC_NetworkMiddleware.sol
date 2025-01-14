@@ -10,6 +10,7 @@ import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IDefaultOperatorRewards} from "rewards/src/interfaces/defaultOperatorRewards/IDefaultOperatorRewards.sol";
 import {IDefaultStakerRewards} from "rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
@@ -24,7 +25,13 @@ import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
 
-contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgradeable, MultisigValidated {
+contract NetworkMiddleware is
+    Initializable,
+    SimpleKeyRegistry32,
+    OwnableUpgradeable,
+    MultisigValidated,
+    ReentrancyGuard
+{
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using MapWithTimeData for EnumerableMap.AddressToUintMap;
     using SafeERC20 for IERC20;
@@ -408,7 +415,12 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         address operator,
         uint256 amount,
         bytes[] calldata signatures
-    ) public onlyMultisig(abi.encode(slashIndex, epoch, operator, amount), signatures) updateStakeCache(epoch) {
+    )
+        public
+        nonReentrant
+        onlyMultisig(abi.encode(slashIndex, epoch, operator, amount), signatures)
+        updateStakeCache(epoch)
+    {
         uint48 epochStartTs = getEpochStartTs(epoch);
 
         if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
@@ -431,11 +443,11 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             }
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
                 bytes32 subnetwork = NETWORK.subnetwork(j);
+                slashedInfos[slashIndex++] =
+                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
                 uint256 vaultStake =
                     IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
                 _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
-                slashedInfos[slashIndex++] =
-                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
             }
         }
     }

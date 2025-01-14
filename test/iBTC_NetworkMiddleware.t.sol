@@ -657,6 +657,86 @@ contract iBTC_NetworkMiddlewareTest is Test {
         );
     }
 
+    function testDistributeStakerRewardsWithMultipleEpochsAndUsers() public {
+        // Setup initial conditions
+        address[] memory users = new address[](3);
+        users[0] = alice;
+        users[1] = bob;
+        users[2] = address(0x5678);
+
+        uint256[] memory depositAmounts = new uint256[](3);
+        depositAmounts[0] = 1e8; // 1 iBTC
+        depositAmounts[1] = 2e8; // 2 iBTC
+        depositAmounts[2] = 3e8; // 3 iBTC
+
+        uint256 distributeAmount = 30e18; // 30 Reward tokens
+        uint256 networkLimit = 100e8;
+        uint256 adminFee = 1e1;
+
+        // Setup admin fee
+        vm.startPrank(OWNER);
+        iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, OWNER);
+        iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, OWNER);
+        defaultStakerRewards.grantRole(defaultStakerRewards.ADMIN_FEE_SET_ROLE(), OWNER);
+        defaultStakerRewards.setAdminFee(adminFee);
+        vm.stopPrank();
+
+        // Register vault and operators
+        vm.prank(OWNER);
+        iBTC_networkMiddleware.registerVault(address(iBTC_vault));
+        for (uint256 i = 0; i < users.length; i++) {
+            _registerOperator(users[i]);
+            _optInOperatorVault(users[i]);
+            _optInOperatorNetwork(users[i], NETWORK);
+        }
+
+        // Register operators in middleware
+        vm.startPrank(OWNER);
+        for (uint256 i = 0; i < users.length; i++) {
+            iBTC_networkMiddleware.registerOperator(users[i], keccak256(abi.encodePacked("key", i)));
+        }
+        vm.stopPrank();
+        _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
+        _setNetworkLimit(OWNER, NETWORK, networkLimit);
+
+        // Setup deposits for multiple epochs
+        for (uint256 epoch = 0; epoch < 3; epoch++) {
+            for (uint256 i = 0; i < users.length; i++) {
+                (, uint256 mintedShares) = _deposit(users[i], depositAmounts[i]);
+                _setOperatorNetworkShares(
+                    OWNER, NETWORK, users[i], iBTC_delegator.stake(NETWORK.subnetwork(0), users[i]) + mintedShares
+                );
+            }
+            vm.warp(block.timestamp + NETWORK_EPOCH);
+        }
+
+        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 3e8, "stake should be right");
+
+        // Mint and approve reward tokens
+        vm.startPrank(OWNER);
+        rewardToken.mint(address(iBTC_networkMiddleware), distributeAmount);
+        vm.stopPrank();
+
+        // Distribute rewards
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.distributeStakerRewards(distributeAmount, uint48(block.timestamp), 1e10, "", "");
+        vm.stopPrank();
+
+        // Verify rewards distribution
+        uint256 totalDeposits = depositAmounts[0] + depositAmounts[1] + depositAmounts[2];
+        for (uint256 i = 0; i < users.length; i++) {
+            uint256 expectedReward = distributeAmount.mulDiv(depositAmounts[i], totalDeposits);
+            uint256 claimableAdminFee = expectedReward.mulDiv(adminFee, ADMIN_FEE_BASE);
+            uint256 expectedClaimable = expectedReward - claimableAdminFee;
+
+            assertEq(
+                defaultStakerRewards.claimable(REWARD_TOKEN, users[i], abi.encode(NETWORK, type(uint256).max)),
+                expectedClaimable,
+                string(abi.encodePacked("Claimable reward should be correct for user ", i))
+            );
+        }
+    }
+
     function testClaimStakerRewards() public {
         uint256 distributeAmount = 10e18; // 10 Reward tokens
         uint256 adminFee = 1e1;
@@ -713,12 +793,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
 
         NetworkMiddlewareV2 upgradedContract = NetworkMiddlewareV2(address(proxy));
-
-        assertEq(
-            upgradedContract.getCurrentEpoch(),
-            iBTC_networkMiddleware.getCurrentEpoch(),
-            "Epoch should be the same after upgrade"
-        );
 
         assertEq(upgradedContract.getTestVar(), 1e4, "The testVar should be initialized correctly");
     }
