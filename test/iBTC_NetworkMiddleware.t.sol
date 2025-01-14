@@ -9,7 +9,7 @@ import {OperatorRegistry} from "core/src/contracts/OperatorRegistry.sol";
 import {NetworkMiddleware} from "src/iBTC_NetworkMiddleware.sol";
 import {NetworkRestakeDelegator} from "core/src/contracts/delegator/NetworkRestakeDelegator.sol";
 import {OptInService} from "core/src/contracts/service/OptInService.sol";
-import {Vault} from "core/src/contracts/Vault/Vault.sol";
+import {Vault} from "core/src/contracts/vault/Vault.sol";
 import {Subnetwork} from "core/src/contracts/libraries/Subnetwork.sol";
 import {VaultConfigurator} from "core/src/contracts/VaultConfigurator.sol";
 import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
