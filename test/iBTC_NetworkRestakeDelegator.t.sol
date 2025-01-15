@@ -9,9 +9,10 @@ import {OperatorRegistry} from "core/src/contracts/OperatorRegistry.sol";
 import {NetworkMiddleware} from "src/iBTC_NetworkMiddleware.sol";
 import {NetworkRestakeDelegator} from "core/src/contracts/delegator/NetworkRestakeDelegator.sol";
 import {OptInService} from "core/src/contracts/service/OptInService.sol";
-import {iBTC_Vault} from "src/iBTC_Vault.sol";
+import {Vault} from "core/src/contracts/vault/Vault.sol";
 import {Subnetwork} from "core/src/contracts/libraries/Subnetwork.sol";
-import {VaultConfigurator} from "src/iBTC_VaultConfigurator.sol";
+import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
+import {VaultConfigurator} from "core/src/contracts/VaultConfigurator.sol";
 import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
 import {MetadataService} from "core/test/service/MetadataService.t.sol";
@@ -119,7 +120,7 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
     NetworkMiddleware public iBTC_networkMiddleware;
     BurnerRouter public burner;
     VaultConfigurator public vaultConfigurator;
-    iBTC_Vault public iBTC_vault;
+    Vault public vault;
     NetworkRegistry networkRegistry;
     OperatorRegistry operatorRegistry;
     NetworkRestakeDelegator iBTC_delegator;
@@ -262,23 +263,23 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         );
 
         if (depositWhitelist) {
-            iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), OWNER);
-            iBTC_Vault(vault_).grantRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+            Vault(vault_).grantRole(Vault(vault_).DEFAULT_ADMIN_ROLE(), OWNER);
+            Vault(vault_).grantRole(Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
 
             for (uint256 i; i < whitelistedDepositors.length; ++i) {
-                iBTC_Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
+                Vault(vault_).setDepositorWhitelistStatus(whitelistedDepositors[i], true);
             }
 
-            iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
-            iBTC_Vault(vault_).renounceRole(iBTC_Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
+            Vault(vault_).renounceRole(Vault(vault_).DEPOSITOR_WHITELIST_ROLE(), deployer);
+            Vault(vault_).renounceRole(Vault(vault_).DEFAULT_ADMIN_ROLE(), deployer);
         }
         vm.stopPrank();
         // ------------ End Vault Deployment ------------------
-        iBTC_vault = iBTC_Vault(vault_);
+        vault = Vault(vault_);
 
         address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
             IDefaultStakerRewards.InitParams({
-                vault: address(iBTC_vault),
+                vault: vault_,
                 adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
                 defaultAdminRoleHolder: OWNER, // address of the main admin (can manage all roles)
                 adminFeeClaimRoleHolder: OWNER, // address of the admin fee claimer
@@ -604,22 +605,20 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         _setOperatorNetworkShares(alice, NETWORK, alice, operatorNetworkShares1);
         _setOperatorNetworkShares(alice, NETWORK, bob, operatorNetworkShares2);
 
-        blockTimestamp = blockTimestamp + 2 * iBTC_vault.epochDuration();
+        blockTimestamp = blockTimestamp + 2 * vault.epochDuration();
         vm.warp(blockTimestamp);
 
         _grantRole(OWNER, alice, keccak256("NETWORK_LIMIT_SET_ROLE"));
         _setNetworkLimit(alice, NETWORK, networkLimit);
 
         assertEq(
-            iBTC_delegator.networkLimitAt(
-                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
-            ),
+            iBTC_delegator.networkLimitAt(NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * vault.epochDuration()), ""),
             networkLimit
         );
         assertEq(iBTC_delegator.networkLimit(NETWORK.subnetwork(0)), networkLimit);
         assertEq(
             iBTC_delegator.totalOperatorNetworkSharesAt(
-                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
+                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * vault.epochDuration()), ""
             ),
             operatorNetworkShares1 + operatorNetworkShares2
         );
@@ -629,14 +628,14 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         );
         assertEq(
             iBTC_delegator.operatorNetworkSharesAt(
-                NETWORK.subnetwork(0), alice, uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
+                NETWORK.subnetwork(0), alice, uint48(blockTimestamp + 2 * vault.epochDuration()), ""
             ),
             operatorNetworkShares1
         );
         assertEq(iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), alice), operatorNetworkShares1);
         assertEq(
             iBTC_delegator.operatorNetworkSharesAt(
-                NETWORK.subnetwork(0), bob, uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
+                NETWORK.subnetwork(0), bob, uint48(blockTimestamp + 2 * vault.epochDuration()), ""
             ),
             operatorNetworkShares2
         );
@@ -655,15 +654,13 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
             slashAmount1Real
         );
         assertEq(
-            iBTC_delegator.networkLimitAt(
-                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
-            ),
+            iBTC_delegator.networkLimitAt(NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * vault.epochDuration()), ""),
             networkLimit
         );
         assertEq(iBTC_delegator.networkLimit(NETWORK.subnetwork(0)), networkLimit);
         assertEq(
             iBTC_delegator.totalOperatorNetworkSharesAt(
-                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
+                NETWORK.subnetwork(0), uint48(blockTimestamp + 2 * vault.epochDuration()), ""
             ),
             operatorNetworkShares1 + operatorNetworkShares2
         );
@@ -673,14 +670,14 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         );
         assertEq(
             iBTC_delegator.operatorNetworkSharesAt(
-                NETWORK.subnetwork(0), alice, uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
+                NETWORK.subnetwork(0), alice, uint48(blockTimestamp + 2 * vault.epochDuration()), ""
             ),
             operatorNetworkShares1
         );
         assertEq(iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), alice), operatorNetworkShares1);
         assertEq(
             iBTC_delegator.operatorNetworkSharesAt(
-                NETWORK.subnetwork(0), bob, uint48(blockTimestamp + 2 * iBTC_vault.epochDuration()), ""
+                NETWORK.subnetwork(0), bob, uint48(blockTimestamp + 2 * vault.epochDuration()), ""
             ),
             operatorNetworkShares2
         );
@@ -717,7 +714,7 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         address user
     ) internal {
         vm.startPrank(user);
-        vault_optIn_service.optIn(address(iBTC_vault));
+        vault_optIn_service.optIn(address(vault));
         vm.stopPrank();
     }
 
@@ -739,14 +736,14 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
         uint256 operatorBalance = iBTC.balanceOf(user);
         assertEq(operatorBalance, amount, "Operator should have minted tokens");
         vm.startPrank(user);
-        iBTC.approve(address(iBTC_vault), amount);
-        (depositedAmount, mintedShares) = iBTC_vault.deposit(user, amount);
+        iBTC.approve(address(vault), amount);
+        (depositedAmount, mintedShares) = vault.deposit(user, amount);
         vm.stopPrank();
     }
 
     function _withdraw(address user, uint256 amount) internal returns (uint256 burnedShares, uint256 mintedShares) {
         vm.startPrank(user);
-        (burnedShares, mintedShares) = iBTC_vault.withdraw(user, amount);
+        (burnedShares, mintedShares) = vault.withdraw(user, amount);
         vm.stopPrank();
     }
 
