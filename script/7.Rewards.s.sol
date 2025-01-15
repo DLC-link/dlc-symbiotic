@@ -14,12 +14,12 @@ contract DeployRewards is Script {
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
 
     function run(
-        address vault
+        address iBTC_vault
     ) external {
         vm.startBroadcast();
         address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
             IDefaultStakerRewards.InitParams({
-                vault: vault,
+                vault: address(iBTC_vault),
                 adminFee: 1000, // admin fee percent to get from all the rewards distributions (10% = 1_000 | 100% = 10_000)
                 defaultAdminRoleHolder: OWNER, // address of the main admin (can manage all roles)
                 adminFeeClaimRoleHolder: OWNER, // address of the admin fee claimer
