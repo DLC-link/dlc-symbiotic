@@ -62,7 +62,7 @@ contract DeployAll is Script {
     */
     uint48 constant VAULT_EPOCH_DURATION = 14 days; // Vault Epoch Duration: Ensures ample time for slashing execution and avoids conflicts.
     uint48 constant NETWORK_EPOCH = 4 days; // Network Epoch: Defines how frequently the network processes updates or slashing events.
-    uint48 constant SLASHING_WINDOW = 6 days; // Slashing Window: The duration within which slashing requests can be executed.
+    uint48 constant SLASHING_WINDOW = 10 days; // Slashing Window: The duration within which slashing requests can be executed.
     uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
     uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for executing a slashing request.
     uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.

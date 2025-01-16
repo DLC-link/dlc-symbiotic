@@ -94,11 +94,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address REWARD_TOKEN;
 
     /*
-    Rules:
-    1. Vault Epoch Duration should be significantly greater than validatorSetCaptureDelay + Network Epoch + Slashing Window.
-    2. Veto Duration should not be too close to Vault Epoch Duration to prevent delays or high gas costs from hindering slashing execution.
-    3. Provide sufficient buffer time to ensure slashing requests can be executed safely.
-
     Contraints:
     1. NETWORK_EPOCH + SLASHING_WINDOW <= VAULT_EPOCH
     */
@@ -108,8 +103,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
     uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
     uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for initiating a slashing request.
     uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
-    uint48 constant maxSlashExecutionDelay = 6 days; // Maximum time to execute a slash request after approval.
-    uint48 constant SLASHING_WINDOW = maxSlashRequestDelay + vetoDuration + maxSlashExecutionDelay; // Total slashing time allowed within a network epoch.
+    uint48 constant SLASHING_WINDOW = 10 days; // Total slashing time allowed within a network epoch.
 
     uint16 threshold = 2; // for test case
     uint16 minimumThreshold = 2;

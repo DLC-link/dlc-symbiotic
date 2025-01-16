@@ -29,8 +29,7 @@ contract DeployNetworkMiddleware is Script {
     uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
     uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for initiating a slashing request.
     uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
-    uint48 constant maxSlashExecutionDelay = 6 days; // Maximum time to execute a slash request after approval.
-    uint48 constant SLASHING_WINDOW = maxSlashRequestDelay + vetoDuration + maxSlashExecutionDelay; // Total slashing time allowed within a network epoch.
+    uint48 constant SLASHING_WINDOW = 10 days; // Total slashing time allowed within a network epoch.
 
     uint16 constant threshold = 2; // for test case
     uint16 constant minimumThreshold = 2;
