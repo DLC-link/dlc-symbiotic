@@ -10,13 +10,17 @@ contract iBTC_GlobalReceiver is OwnableUpgradeable {
 
     address public collateral;
 
+    uint256[50] __gap;
+
     event TokensRedistribution(address indexed token, address indexed to, uint256 amount);
 
     error ZeroToAddress();
     error ZeroAmount();
     error InsufficientBalance();
 
-    constructor() {}
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(address iBTC, address initialOwner) public initializer {
         require(iBTC != address(0), "Invalid iBTC address");
