@@ -92,18 +92,26 @@ contract iBTC_NetworkMiddlewareTest is Test {
     address STAKER_REWARDS;
     address OPERATOR_REWARDS;
     address REWARD_TOKEN;
-
     /*
-    Contraints:
-    1. NETWORK_EPOCH + SLASHING_WINDOW <= VAULT_EPOCH
+    Notes:
+    1. SLASHING_WINDOW is derived from EPOCH_DURATION and maxSlashRequestDelay.
+    2. SLASHING_WINDOW + vetoDuration must always be less than VAULT_EPOCH_DURATION.
+    3. This configuration allows for a buffer of 7 days (maxSlashExecutionDelay) for off-chain slashing execution.
+    4. The setup can accommodate vaults with shorter epoch durations or higher veto durations by adjusting SLASHING_WINDOW.
     */
+    // Vault parameters
+    uint48 constant VAULT_EPOCH_DURATION = 14 days; // Total duration of the vault's epoch.
+    uint48 constant vetoDuration = 1 days; // Time allocated for vetoing a slashing request.
 
-    uint48 constant VAULT_EPOCH_DURATION = 14 days; // Vault Epoch Duration: Ensures ample time for slashing execution and avoids conflicts.
-    uint48 constant NETWORK_EPOCH = 4 days; // Network Epoch: Defines how frequently the network processes updates or slashing events.
-    uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
-    uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for initiating a slashing request.
-    uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
-    uint48 constant SLASHING_WINDOW = 10 days; // Total slashing time allowed within a network epoch.
+    // Middleware parameters
+    uint48 constant validatorSetCaptureDelay = 15 minutes; // Time delay before capturing the validator set.
+    uint48 constant NETWORK_EPOCH = 4 days; // Duration of a network epoch for processing updates or slashing events.
+    uint48 constant maxSlashRequestDelay = 2 days; // Maximum delay allowed for initiating a slashing request.
+    uint48 constant SLASHING_WINDOW = 6 days; // Total time allocated for slashing in a network epoch (EPOCH_DURATION + maxSlashRequestDelay).
+
+    // Derived values (off-chain consideration)
+    uint48 maxSlashExecutionDelay = VAULT_EPOCH_DURATION - SLASHING_WINDOW - vetoDuration;
+    // maxSlashExecutionDelay = 14 days - 6 days - 1 day = 7 days
 
     uint16 threshold = 2; // for test case
     uint16 minimumThreshold = 2;
@@ -826,6 +834,102 @@ contract iBTC_NetworkMiddlewareTest is Test {
         // Mint and approve reward tokens
     }
 
+    function testDistributeAndClaimStakerRewardsWithMultipleUsers() public {
+        uint256 alice_depositAmount = 1e8;
+        uint256 bob_depositAmount = 2e8;
+        uint256 networkLimit = 100e8;
+        uint256 adminFee = 1e1;
+        uint256 maxAdminFee = 1e10;
+        uint256 distributeAmount = 10e18;
+        uint48 blockTimestamp = uint48(Time.timestamp() + 1_720_700_948);
+        console.log(blockTimestamp, "Block Timestamp");
+        vm.warp(blockTimestamp);
+
+        // Setup admin fee
+        vm.startPrank(OWNER);
+        defaultStakerRewards.grantRole(defaultStakerRewards.ADMIN_FEE_SET_ROLE(), OWNER);
+        // base admin fee already initialized in DefaultStakerRewards = 1e4
+        defaultStakerRewards.setAdminFee(adminFee);
+        vm.stopPrank();
+
+        // Setup network shares
+        vm.startPrank(OWNER);
+        iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
+        iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        vm.stopPrank();
+
+        // Register vault and operator
+        vm.prank(OWNER);
+        iBTC_networkMiddleware.registerVault(address(vault));
+        _registerOperator(alice);
+        _registerOperator(bob);
+        _optInOperatorVault(alice);
+        _optInOperatorVault(bob);
+        _optInOperatorNetwork(alice, NETWORK);
+        _optInOperatorNetwork(bob, NETWORK);
+
+        // Register operator in middleware
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.registerOperator(alice, alice_key);
+        iBTC_networkMiddleware.registerOperator(bob, bob_key);
+        _mintRewardToken(distributeAmount);
+        vm.stopPrank();
+
+        _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
+        _setNetworkLimit(alice, NETWORK, networkLimit);
+
+        (, uint256 alice_mintedShares) = _deposit(alice, alice_depositAmount);
+        (, uint256 bob_mintedShares) = _deposit(bob, bob_depositAmount);
+        uint256 alice_currentStake = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(blockTimestamp), "");
+        uint256 bob_currentStake = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), bob, uint48(blockTimestamp), "");
+        _setOperatorNetworkShares(alice, NETWORK, alice, alice_currentStake + alice_mintedShares);
+        _setOperatorNetworkShares(alice, NETWORK, bob, bob_currentStake + bob_mintedShares);
+
+        blockTimestamp = blockTimestamp + NETWORK_EPOCH;
+        vm.warp(blockTimestamp);
+        uint48 rewardTimestamp = blockTimestamp - 1;
+
+        vm.startPrank(OWNER);
+        vm.expectEmit(true, true, true, true);
+        emit StakerRewardsDistributed(
+            iBTC_networkMiddleware.getCurrentEpoch(),
+            distributeAmount,
+            iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(rewardTimestamp), "")
+                + iBTC_delegator.stakeAt(NETWORK.subnetwork(0), bob, uint48(rewardTimestamp), ""),
+            blockTimestamp
+        );
+        iBTC_networkMiddleware.distributeStakerRewards(distributeAmount, rewardTimestamp, maxAdminFee, "", "");
+        vm.stopPrank();
+
+        assertEq(
+            vault.activeSharesAt(rewardTimestamp, ""),
+            alice_mintedShares + bob_mintedShares,
+            "activeShares should be right"
+        );
+        uint256 adminFeeAmount = distributeAmount.mulDiv(adminFee, ADMIN_FEE_BASE);
+        distributeAmount = distributeAmount - adminFeeAmount;
+
+        uint256 aliceClaimableReward =
+            distributeAmount.mulDiv(alice_mintedShares, alice_mintedShares + bob_mintedShares);
+        uint256 bobClaimableReward = distributeAmount.mulDiv(bob_mintedShares, alice_mintedShares + bob_mintedShares);
+        assertEq(
+            defaultStakerRewards.claimable(address(rewardToken), alice, abi.encode(NETWORK, type(uint256).max)),
+            aliceClaimableReward,
+            "claimable for alice should be right"
+        );
+        assertEq(
+            defaultStakerRewards.claimable(address(rewardToken), bob, abi.encode(NETWORK, type(uint256).max)),
+            bobClaimableReward,
+            "claimable for bob should be right"
+        );
+        vm.prank(alice);
+        defaultStakerRewards.claimRewards(alice, address(rewardToken), abi.encode(NETWORK, type(uint256).max, ""));
+        vm.prank(bob);
+        defaultStakerRewards.claimRewards(bob, address(rewardToken), abi.encode(NETWORK, type(uint256).max, ""));
+        assertEq(rewardToken.balanceOf(alice), aliceClaimableReward, "alice should have claimed all rewards");
+        assertEq(rewardToken.balanceOf(bob), bobClaimableReward, "bob should have claimed all rewards");
+    }
+
     function testClaimStakerRewards() public {
         uint256 distributeAmount = 10e18; // 10 Reward tokens
         uint256 adminFee = 1e1;
@@ -850,14 +954,31 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 merkleRoot = Hashes.commutativeKeccak256(leaf, proof);
 
         // Mint reward tokens
-        vm.startPrank(OWNER);
-        rewardToken.mint(address(iBTC_networkMiddleware), rewardAmount);
-
+        _mintRewardToken(rewardAmount);
         // Distribute rewards
+        vm.startPrank(OWNER);
         vm.expectEmit(true, true, true, true);
         emit OperatorRewardsDistributed(iBTC_networkMiddleware.getCurrentEpoch(), rewardAmount, block.timestamp);
         iBTC_networkMiddleware.distributeOperatorRewards(rewardAmount, merkleRoot);
         vm.stopPrank();
+    }
+
+    function testDistributeOperatorRewardsAcrossMultipleEpochs() public {
+        uint256 rewardAmount = 1e9;
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(alice, rewardAmount))));
+        bytes32 proof = keccak256(abi.encode("test_merkle_root"));
+        bytes32 merkleRoot = Hashes.commutativeKeccak256(leaf, proof);
+
+        // Mint reward tokens
+        for (uint256 i; i < 10; ++i) {
+            _mintRewardToken(rewardAmount);
+            vm.warp(Time.timestamp() + NETWORK_EPOCH);
+            vm.startPrank(OWNER);
+            vm.expectEmit(true, true, true, true);
+            emit OperatorRewardsDistributed(iBTC_networkMiddleware.getCurrentEpoch(), rewardAmount, block.timestamp);
+            iBTC_networkMiddleware.distributeOperatorRewards(rewardAmount, merkleRoot);
+            vm.stopPrank();
+        }
     }
 
     function testClaimOperatorRewards() public {
