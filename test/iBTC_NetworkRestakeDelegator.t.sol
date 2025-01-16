@@ -159,6 +159,7 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
 
     ProxyAdmin private proxyAdmin;
     TransparentUpgradeableProxy private proxy;
+    TransparentUpgradeableProxy private gr_proxy;
 
     function setUp() public {
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL);
@@ -188,8 +189,14 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
 
         vaultConfigurator = new VaultConfigurator(VAULT_FACTORY, DELEGATOR_FACTORY, SLASHER_FACTORY);
         //  create Global Receiver
-        iBTC_globalReceiver = new iBTC_GlobalReceiver();
-        iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
+        iBTC_GlobalReceiver grImplementation = new iBTC_GlobalReceiver();
+        gr_proxy = new TransparentUpgradeableProxy(
+            address(grImplementation),
+            OWNER,
+            abi.encodeWithSelector(iBTC_GlobalReceiver.initialize.selector, COLLATERAL, OWNER)
+        );
+        proxyAdmin = ProxyAdmin(_getAdminAddress(address(gr_proxy)));
+        iBTC_globalReceiver = iBTC_GlobalReceiver(address(gr_proxy));
 
         // create Burner Router
         IBurnerRouter.NetworkReceiver[] memory networkReceiver;
