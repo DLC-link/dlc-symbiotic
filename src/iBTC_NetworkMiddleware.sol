@@ -431,11 +431,11 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             }
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
                 bytes32 subnetwork = NETWORK.subnetwork(j);
-                slashedInfos[slashIndex++] =
-                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
                 uint256 vaultStake =
                     IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
                 _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
+                slashedInfos[slashIndex++] =
+                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
             }
         }
     }
@@ -494,7 +494,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
-        //TODO: Calculate the cumulative reward amount
+        //TODO: define a rule for distributeAmount
 
         if (totalStake == 0) {
             revert ZeroTotalStake();
@@ -522,7 +522,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint256 distributeAmount,
         bytes32 merkleRoot
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
-        //TODO: Calculate the cumulative reward amount
+        //TODO: define a rule for distributeAmount
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }
