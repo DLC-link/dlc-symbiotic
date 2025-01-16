@@ -431,11 +431,11 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             }
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
                 bytes32 subnetwork = NETWORK.subnetwork(j);
+                slashedInfos[slashIndex++] =
+                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
                 uint256 vaultStake =
                     IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
                 _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
-                slashedInfos[slashIndex++] =
-                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
             }
         }
     }

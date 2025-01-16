@@ -770,7 +770,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         assertEq(rewardToken.balanceOf(alice), claimableAmount, "claimable amount should be right");
     }
 
-    //NOTE: still not done
     function testCalcAndCacheStakes() public {
         uint256 alice_depositAmount = 10e8; // 10 iBTC
         uint256 bob_depositAmount = 5e8; // 10 iBTC
@@ -786,6 +785,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         _optInOperatorVault(bob);
 
         vm.startPrank(OWNER);
+        iBTC_networkMiddleware.registerVault(address(vault));
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, address(this));
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, address(this));
         iBTC_networkMiddleware.registerOperator(alice, alice_key);
@@ -853,7 +853,39 @@ contract iBTC_NetworkMiddlewareTest is Test {
                     "bob stake should be right"
                 );
             }
-            console.log(i, "epoch_i");
+            (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(alice);
+            console.log(
+                iBTC_networkMiddleware.getOperatorStake(alice, iBTC_networkMiddleware.getCurrentEpoch()),
+                "alice_stake__"
+            );
+            console.log(
+                iBTC_delegator.stakeAt(
+                    NETWORK.subnetwork(0),
+                    alice,
+                    iBTC_networkMiddleware.getEpochStartTs(iBTC_networkMiddleware.getCurrentEpoch()),
+                    ""
+                ),
+                "alice_stake_at__"
+            );
+            assertEq(
+                iBTC_delegator.stakeAt(
+                    NETWORK.subnetwork(0),
+                    alice,
+                    iBTC_networkMiddleware.getEpochStartTs(iBTC_networkMiddleware.getCurrentEpoch()),
+                    ""
+                ),
+                iBTC_networkMiddleware.getOperatorStake(alice, iBTC_networkMiddleware.getCurrentEpoch()),
+                "alice_stake_at__"
+            );
+            assertEq(
+                iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), alice)
+                    + iBTC_delegator.operatorNetworkShares(NETWORK.subnetwork(0), bob),
+                iBTC_networkMiddleware.calcAndCacheStakes(iBTC_networkMiddleware.getCurrentEpoch()),
+                "cachedStake should update correctly."
+            );
+            console.log(enabledTime, "enabledTime");
+            console.log(disabledTime, "disabledTime");
+            console.log(iBTC_networkMiddleware.getCurrentEpoch(), "epoch_i");
             console.log(
                 iBTC_networkMiddleware.calcAndCacheStakes(iBTC_networkMiddleware.getCurrentEpoch()), "cachedStake_"
             );

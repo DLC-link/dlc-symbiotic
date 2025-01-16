@@ -20,5 +20,4 @@ tab_width = 4
 
 [rpc_endpoints] # test on local anvil which forked sepolia
 default = "http://127.0.0.1:8545"
-sepolia = "https://eth-sepolia.g.alchemy.com/v2/FUx2d2FmMMbgD0ER_Yrir7pmClO2Wqvc"
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
