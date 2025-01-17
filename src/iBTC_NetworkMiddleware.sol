@@ -336,6 +336,12 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         subnetworksCnt = _subnetworksCnt;
     }
 
+    function setRewardToken(
+        address _rewardToken
+    ) external onlyOwner {
+        REWARD_TOKEN = _rewardToken;
+    }
+
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
         if (totalStakeCached[epoch]) {
             return operatorStakeCache[epoch][operator];
@@ -401,57 +407,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         assembly {
             mstore(validatorsData, valIdx)
         }
-    }
-
-    // preserve the slash
-    function slash(
-        uint48 epoch,
-        address operator,
-        uint256 amount,
-        bytes[] calldata signatures
-    ) public onlyMultisig(abi.encode(slashIndex, epoch, operator, amount), signatures) updateStakeCache(epoch) {
-        uint48 epochStartTs = getEpochStartTs(epoch);
-
-        if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
-            revert TooOldEpoch();
-        }
-
-        uint256 totalOperatorStake = getOperatorStake(operator, epoch);
-
-        if (totalOperatorStake < amount) {
-            revert TooBigSlashAmount();
-        }
-
-        // simple pro-rata slasher
-        for (uint256 i; i < vaults.length(); ++i) {
-            (address vault, uint48 enabledTime, uint48 disabledTime) = vaults.atWithTimes(i);
-
-            // just skip the vault if it was enabled after the target epoch or not enabled
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-            for (uint96 j = 0; j < subnetworksCnt; ++j) {
-                bytes32 subnetwork = NETWORK.subnetwork(j);
-                uint256 vaultStake =
-                    IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
-                _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
-                slashedInfos[slashIndex++] =
-                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
-            }
-        }
-    }
-
-    function executeSlash(
-        uint256 slashIndex_,
-        address vault,
-        bytes calldata hints
-    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
-        address slasher = IVault(vault).slasher();
-        uint256 slasherType = IEntity(slasher).TYPE();
-        if (slasherType != VETO_SLASHER_TYPE) {
-            revert NotVetoSlasher();
-        }
-        IVetoSlasher(slasher).executeSlash(slashIndex_, hints);
     }
 
     function calcAndCacheStakes(
