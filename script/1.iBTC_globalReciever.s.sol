@@ -4,16 +4,21 @@ import {Script, console2} from "forge-std/Script.sol";
 import {iBTC_GlobalReceiver} from "../src/iBTC_GlobalReceiver.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {Vm} from "forge-std/Vm.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {ReadFile} from "./libs/ReadFile.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract DeployGlobalReceiver is Script {
     iBTC_GlobalReceiver iBTC_globalReceiver;
-    address constant COLLATERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
+    address COLLATERAL;
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
 
-    function run() external {
+    function run(
+        uint256 _chainId
+    ) external {
+        ReadFile readFile = new ReadFile();
         vm.startBroadcast();
+        COLLATERAL = readFile.readInput(_chainId, "iBTC", "COLLATERAL");
         iBTC_GlobalReceiver grImplementation = new iBTC_GlobalReceiver();
         TransparentUpgradeableProxy gr_proxy = new TransparentUpgradeableProxy(
             address(grImplementation),

@@ -3,6 +3,7 @@ ast = true
 build_info = true
 extra_output = ["storageLayout"]
 ffi = true
+fs_permissions = [{access = "read", path = "script/addresses"}]
 libs = ["lib"]
 out = "out"
 solc = "0.8.25"

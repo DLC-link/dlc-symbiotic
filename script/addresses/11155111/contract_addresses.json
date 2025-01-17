@@ -1,0 +1,66 @@
+{
+    "iBTC": {
+        "contracts": {
+            "COLLATERAL": {
+                "address": "0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74",
+                "description": "iBTC token"
+            }
+        }
+    },
+    "symbiotic": {
+        "contracts": {
+            "VAULT_FACTORY": {
+                "address": "0x407A039D94948484D356eFB765b3c74382A050B4",
+                "description": "Pure vaults’ creator (also allows their migrations)"
+            },
+            "DELEGATOR_FACTORY": {
+                "address": "0x890CA3f95E0f40a79885B7400926544B2214B03f",
+                "description": "Pure delegators’ creator"
+            },
+            "SLASHER_FACTORY": {
+                "address": "0xbf34bf75bb779c383267736c53a4ae86ac7bB299",
+                "description": "Pure slashers’ creator"
+            },
+            "NETWORK_REGISTRY": {
+                "address": "0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9",
+                "description": "Networks’ managing addresses (e.g., DAO contract, multisig, etc.) registrator"
+            },
+            "NETWORK_METADATA_SERVICE": {
+                "address": "0x0F7E58Cc4eA615E8B8BEB080dF8B8FDB63C21496",
+                "description": "Networks’ metadata setter"
+            },
+            "NETWORK_MIDDLEWARE_SERVICE": {
+                "address": "0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3",
+                "description": "Networks’ middleware addresses setter"
+            },
+            "OPERATOR_REGISTRY": {
+                "address": "0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548",
+                "description": "Operators’ managing addresses (e.g., DAO contract, multisig, etc.) registrator"
+            },
+            "OPERATOR_METADATA_SERVICE": {
+                "address": "0x0999048aB8eeAfa053bF8581D4Aa451ab45755c9",
+                "description": "Operators’ metadata setter"
+            },
+            "VAULT_OPTIN_SERVICE": {
+                "address": "0x95CC0a052ae33941877c9619835A233D21D57351",
+                "description": "A contract for operators’ opt-ins to vaults"
+            },
+            "NETWORK_OPTIN_SERVICE": {
+                "address": "0x58973d16FFA900D11fC22e5e2B6840d9f7e13401",
+                "description": "A contract for operators’ opt-ins to networks"
+            },
+            "VAULT_CONFIGURATOR": {
+                "address": "0xD2191FE92987171691d552C219b8caEf186eb9cA",
+                "description": "Ready-to-work vaults’ creator"
+            },
+            "DEFAULT_STAKER_REWARDS_FACTORY": {
+                "address": "0x70C618a13D1A57f7234c0b893b9e28C5cA8E7f37",
+                "description": "Default staker rewards contracts’ creator"
+            },
+            "DEFAULT_OPERATOR_REWARDS_FACTORY": {
+                "address": "0x8D6C873cb7ffa6BE615cE1D55801a9417Ed55f9B",
+                "description": "Default operator rewards contracts’ creator"
+            }
+        }
+    }
+}

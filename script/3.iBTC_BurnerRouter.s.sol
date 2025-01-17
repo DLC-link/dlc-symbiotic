@@ -4,17 +4,18 @@ import {Script, console2} from "forge-std/Script.sol";
 import {BurnerRouter} from "burners/src/contracts/router/BurnerRouter.sol";
 import {BurnerRouterFactory} from "burners/src/contracts/router/BurnerRouterFactory.sol";
 import {IBurnerRouter} from "burners/src/interfaces/router/IBurnerRouter.sol";
+import {ReadFile} from "./libs/ReadFile.sol";
 
 contract DeployBurnerRouter is Script {
     BurnerRouter burner;
 
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
-    address constant COLLATERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
+    address COLLATERAL;
 
-    function run(
-        address iBTC_globalReceiver
-    ) external {
+    function run(uint256 _chainId, address iBTC_globalReceiver) external {
         vm.startBroadcast();
+        ReadFile readFile = new ReadFile();
+        COLLATERAL = readFile.readInput(_chainId, "iBTC", "COLLATERAL");
         IBurnerRouter.InitParams memory params = IBurnerRouter.InitParams({
             owner: OWNER,
             collateral: COLLATERAL,
