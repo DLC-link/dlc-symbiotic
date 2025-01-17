@@ -86,19 +86,26 @@ contract iBTC_NetworkRestakeDelegatorTest is Test {
     address STAKER_REWARDS;
     address OPERATOR_REWARDS;
     address REWARD_TOKEN;
-
     /*
-    Rules:
-    1. Vault Epoch Duration should be significantly greater than validatorSetCaptureDelay + Network Epoch + Slashing Window.
-    2. Veto Duration should not be too close to Vault Epoch Duration to prevent delays or high gas costs from hindering slashing execution.
-    3. Provide sufficient buffer time to ensure slashing requests can be executed safely.
+    Notes:
+    1. SLASHING_WINDOW is derived from EPOCH_DURATION and maxSlashRequestDelay.
+    2. SLASHING_WINDOW + vetoDuration must always be less than VAULT_EPOCH_DURATION.
+    3. This configuration allows for a buffer of 7 days (maxSlashExecutionDelay) for off-chain slashing execution.
+    4. The setup can accommodate vaults with shorter epoch durations or higher veto durations by adjusting SLASHING_WINDOW.
     */
-    uint48 constant VAULT_EPOCH_DURATION = 14 days; // Vault Epoch Duration: Ensures ample time for slashing execution and avoids conflicts.
-    uint48 constant NETWORK_EPOCH = 4 days; // Network Epoch: Defines how frequently the network processes updates or slashing events.
-    uint48 constant SLASHING_WINDOW = 6 days; // Slashing Window: The duration within which slashing requests can be executed.
-    uint48 constant validatorSetCaptureDelay = 15 minutes; // Validator Set Capture Delay: Time to wait for block finality (e.g., on Ethereum).
-    uint48 constant maxSlashRequestDelay = 2 days; // Max Slash Request Delay: Maximum allowed delay for executing a slashing request.
-    uint48 constant vetoDuration = 1 days; // Veto Duration: Time allocated for vetoing a slashing request.
+    // Vault parameters
+    uint48 constant VAULT_EPOCH_DURATION = 14 days; // Total duration of the vault's epoch.
+    uint48 constant vetoDuration = 1 days; // Time allocated for vetoing a slashing request.
+
+    // Middleware parameters
+    uint48 constant validatorSetCaptureDelay = 15 minutes; // Time delay before capturing the validator set.
+    uint48 constant NETWORK_EPOCH = 4 days; // Duration of a network epoch for processing updates or slashing events.
+    uint48 constant maxSlashRequestDelay = 2 days; // Maximum delay allowed for initiating a slashing request.
+    uint48 constant SLASHING_WINDOW = 6 days; // Total time allocated for slashing in a network epoch (EPOCH_DURATION + maxSlashRequestDelay).
+
+    // Derived values (off-chain consideration)
+    uint48 maxSlashExecutionDelay = VAULT_EPOCH_DURATION - SLASHING_WINDOW - vetoDuration;
+    // maxSlashExecutionDelay = 14 days - 6 days - 1 day = 7 days
 
     EnumerableMap.AddressToUintMap operators;
 

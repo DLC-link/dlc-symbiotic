@@ -494,7 +494,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
-        //TODO: Calculate the cumulative reward amount
 
         if (totalStake == 0) {
             revert ZeroTotalStake();
@@ -522,7 +521,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint256 distributeAmount,
         bytes32 merkleRoot
     ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
-        //TODO: Calculate the cumulative reward amount
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }
