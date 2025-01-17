@@ -20,6 +20,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {ReadFile} from "./libs/ReadFile.sol";
 
 import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
 import {IVaultConfigurator} from "@symbiotic/interfaces/IVaultConfigurator.sol";
@@ -38,18 +39,19 @@ import {IDefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewa
 //NOTICE: This script for some reason doesn't work for now
 contract DeployAll is Script {
     // ------------------------------- contracts on sepolia -------------------------------
-    address constant NETWORK_MIDDLEWARE_SERVICE = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
-    address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
-    address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
-    address constant COLLATERAL = 0xeb762Ed11a09E4A394C9c8101f8aeeaf5382ED74;
-    address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4;
-    address constant DELEGATOR_FACTORY = 0x890CA3f95E0f40a79885B7400926544B2214B03f;
-    address constant SLASHER_FACTORY = 0xbf34bf75bb779c383267736c53a4ae86ac7bB299;
-    address constant NEWTORK_OPTIN_SERVICE = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
-    address constant VAULT_OPTIN_SERVICE = 0x95CC0a052ae33941877c9619835A233D21D57351;
+    address NETWORK_MIDDLEWARE_SERVICE;
+    address NETWORK_REGISTRY;
+    address OPERATOR_REGISTRY;
+    address COLLATERAL;
+    address VAULT_FACTORY;
+    address DELEGATOR_FACTORY;
+    address SLASHER_FACTORY;
+    address NEWTORK_OPTIN_SERVICE;
+    address VAULT_OPTIN_SERVICE;
+    address DEFAULT_STAKER_REWARDS_FACTORY;
+    address DEFAULT_OPERATOR_REWARDS_FACTORY;
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
-    address constant DEFAULT_STAKER_REWARDS_FACTORY = 0x70C618a13D1A57f7234c0b893b9e28C5cA8E7f37;
-    address constant DEFAULT_OPERATOR_REWARDS_FACTORY = 0x8D6C873cb7ffa6BE615cE1D55801a9417Ed55f9B;
+
     address NETWORK;
     address STAKER_REWARDS;
     address OPERATOR_REWARDS;
@@ -95,7 +97,21 @@ contract DeployAll is Script {
     ProxyAdmin public proxyAdmin;
     TransparentUpgradeableProxy public proxy;
 
-    function run() external {
+    function run(
+        uint256 _chainId
+    ) external {
+        ReadFile readFile = new ReadFile();
+        NETWORK_MIDDLEWARE_SERVICE = readFile.readInput(_chainId, "symbiotic", "NETWORK_MIDDLEWARE_SERVICE");
+        NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
+        OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
+        COLLATERAL = readFile.readInput(_chainId, "symbiotic", "COLLATERAL");
+        VAULT_FACTORY = readFile.readInput(_chainId, "symbiotic", "VAULT_FACTORY");
+        DELEGATOR_FACTORY = readFile.readInput(_chainId, "symbiotic", "DELEGATOR_FACTORY");
+        SLASHER_FACTORY = readFile.readInput(_chainId, "symbiotic", "SLASHER_FACTORY");
+        NEWTORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NEWTORK_OPTIN_SERVICE");
+        VAULT_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "VAULT_OPTIN_SERVICE");
+        DEFAULT_STAKER_REWARDS_FACTORY = readFile.readInput(_chainId, "symbiotic", "DEFAULT_STAKER_REWARDS_FACTORY");
+        DEFAULT_OPERATOR_REWARDS_FACTORY = readFile.readInput(_chainId, "symbiotic", "DEFAULT_OPERATOR_REWARDS_FACTORY");
         uint256 depositLimit = 1e10;
         address hook = 0x0000000000000000000000000000000000000000;
         uint64 delegatorIndex = 0;
