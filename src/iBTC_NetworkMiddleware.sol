@@ -96,6 +96,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     uint48 public EPOCH_DURATION;
     uint48 public SLASHING_WINDOW;
     uint48 public START_TIME;
+    bytes32 public constant REWARD_DISTRIBUTION_ROLE = keccak256("REWARD_DISTRIBUTION_ROLE");
 
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
@@ -157,7 +158,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         _checkNonZeroAddress(_owner, "ZeroOwner");
         _checkNonZeroAddress(_stakerReward, "ZeroStakerReward");
         _checkNonZeroAddress(_operatorReward, "ZeroOperatorReward");
-        _checkNonZeroAddress(_rewardToken, "ZeroRewardToken");
 
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
@@ -491,7 +491,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint256 maxAdminFee,
         bytes calldata activeSharesHint,
         bytes calldata activeStakeHint
-    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+    ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
 
@@ -520,7 +520,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     function distributeOperatorRewards(
         uint256 distributeAmount,
         bytes32 merkleRoot
-    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+    ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }

@@ -657,6 +657,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
         vm.stopPrank();
 
         // Register vault and operator
@@ -758,6 +759,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
         vm.stopPrank();
 
         // Register vault and operator
@@ -856,6 +858,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
         vm.stopPrank();
 
         // Register vault and operator
@@ -953,6 +956,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 proof = keccak256(abi.encode("test_merkle_root"));
         bytes32 merkleRoot = Hashes.commutativeKeccak256(leaf, proof);
 
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
+        vm.stopPrank();
         // Mint reward tokens
         _mintRewardToken(rewardAmount);
         // Distribute rewards
@@ -969,6 +975,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 proof = keccak256(abi.encode("test_merkle_root"));
         bytes32 merkleRoot = Hashes.commutativeKeccak256(leaf, proof);
 
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
+        vm.stopPrank();
         // Mint reward tokens
         for (uint256 i; i < 10; ++i) {
             _mintRewardToken(rewardAmount);
