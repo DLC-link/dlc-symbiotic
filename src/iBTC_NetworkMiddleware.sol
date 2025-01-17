@@ -403,6 +403,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         }
     }
 
+    // preserve the slash
     function slash(
         uint48 epoch,
         address operator,
