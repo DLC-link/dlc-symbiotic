@@ -61,9 +61,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error InvalidEpoch();
 
     error SlashingWindowTooShort();
-    error TooBigSlashAmount();
     error UnknownSlasherType();
-    error NotVetoSlasher();
 
     error ZeroTotalStake();
     error ZeroRewardAmount();
@@ -75,13 +73,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     struct ValidatorData {
         uint256 stake;
         bytes32 key;
-    }
-
-    struct SlashedInfo {
-        uint48 epoch;
-        address operator;
-        uint256 slashedAmount;
-        uint256 timeStamp;
     }
 
     address public NETWORK;
@@ -96,14 +87,13 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     uint48 public EPOCH_DURATION;
     uint48 public SLASHING_WINDOW;
     uint48 public START_TIME;
-    bytes32 public constant REWARD_DISTRIBUTION_ROLE = keccak256("REWARD_DISTRIBUTION_ROLE");
+    bytes32 public constant REWARD_DISTRIBUTION_ROLE =
+        0x9f89a45310bee56665a077229020c3130eedbd18bff771c3dc399fb850b2e12f; // keccak256("REWARD_DISTRIBUTION_ROLE");
 
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
-    uint256 public slashIndex;
     uint256 public subnetworksCnt;
-    mapping(uint256 slashIndex => SlashedInfo) slashedInfos;
     mapping(uint48 => uint256) public totalStakeCache;
     mapping(uint48 => bool) public totalStakeCached;
     mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
