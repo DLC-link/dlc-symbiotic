@@ -6,12 +6,13 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {ReadFile} from "./libs/ReadFile.sol";
 
 contract DeployNetworkMiddleware is Script {
-    address constant OPERATOR_REGISTRY = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
-    address constant NETWORK_REGISTRY = 0x7d03b7343BF8d5cEC7C0C27ecE084a20113D15C9;
-    address constant NEWTORK_OPTIN_SERVICE = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
-    address constant VAULT_FACTORY = 0x407A039D94948484D356eFB765b3c74382A050B4;
+    address OPERATOR_REGISTRY;
+    address NETWORK_REGISTRY;
+    address NEWTORK_OPTIN_SERVICE;
+    address VAULT_FACTORY;
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
 
     /*
@@ -42,7 +43,19 @@ contract DeployNetworkMiddleware is Script {
     TransparentUpgradeableProxy private proxy;
     NetworkMiddleware private iBTC_networkMiddleware;
 
-    function run(address NETWORK, address STAKER_REWARDS, address OPERATOR_REWARDS, address REWARD_TOKEN) external {
+    function run(
+        uint256 _chainId,
+        address NETWORK,
+        address STAKER_REWARDS,
+        address OPERATOR_REWARDS,
+        address REWARD_TOKEN
+    ) external {
+        ReadFile readFile = new ReadFile();
+        OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
+        NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
+        NEWTORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NEWTORK_OPTIN_SERVICE");
+        VAULT_FACTORY = readFile.readInput(_chainId, "symbiotic", "VAULT_FACTORY");
+
         vm.startBroadcast();
         NetworkMiddleware implementation = new NetworkMiddleware();
         proxy = new TransparentUpgradeableProxy(

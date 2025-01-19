@@ -507,132 +507,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function testSlashAndExecuteOperator() public {
-        uint256 depositAmount = 1e10;
-        uint256 networkLimit = 1e10;
-
-        vm.prank(OWNER);
-        iBTC_networkMiddleware.registerVault(address(vault));
-
-        assertEq(vault.delegator(), address(iBTC_delegator), "delegator should be right.");
-        _setMaxNetworkLimit(NETWORK, 0, networkLimit * 100);
-        _registerOperator(alice);
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        _optInOperatorVault(alice);
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        _optInOperatorNetwork(alice, NETWORK);
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        _setResolver(0, bob);
-
-        assertEq(iBTC_slasher.resolver(NETWORK.subnetwork(0), ""), bob, "resolver should be setting correctly");
-
-        vm.prank(OWNER);
-        iBTC_networkMiddleware.registerOperator(alice, alice_key);
-        (, uint256 mintedShares) = _deposit(alice, depositAmount);
-        assertEq(depositAmount, vault.activeBalanceOfAt(alice, uint48(block.timestamp), ""), "Deposit should be done");
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        vm.prank(OWNER);
-        iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
-        _setNetworkLimit(alice, NETWORK, networkLimit);
-
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), 0);
-
-        vm.prank(OWNER);
-        iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
-        _setOperatorNetworkShares(alice, NETWORK, alice, mintedShares);
-        assertEq(iBTC_delegator.stake(NETWORK.subnetwork(0), alice), mintedShares);
-
-        (uint48 enabledTime, uint48 disabledTime) = iBTC_networkMiddleware.getOperatorInfo(alice);
-        console.log("enabledTime", enabledTime);
-        console.log("disabledTime", disabledTime);
-        uint256 stakeAt = iBTC_delegator.stakeAt(NETWORK.subnetwork(0), alice, uint48(enabledTime), "");
-        assertEq(stakeAt, mintedShares, "StakeAt should stand the same");
-
-        uint48 epoch = iBTC_networkMiddleware.getCurrentEpoch();
-        assertEq(
-            iBTC_networkMiddleware.getOperatorStake(alice, epoch),
-            iBTC_delegator.stake(NETWORK.subnetwork(0), alice),
-            "stake should be the same"
-        );
-
-        uint256 cachedStake = iBTC_networkMiddleware.calcAndCacheStakes(epoch);
-        assertEq(cachedStake, mintedShares, "cache should update");
-
-        uint256 slashAmount = 1e9;
-        vm.warp(Time.timestamp() + 1 days);
-
-        uint48 epochStartTs = iBTC_networkMiddleware.getEpochStartTs(epoch);
-        assertGe(
-            epochStartTs,
-            Time.timestamp() - vault.epochDuration(),
-            "captureTimesstamp needs greater and equal that Time.timestamp()-vault.epochDuration()"
-        );
-        assertLt(epochStartTs, Time.timestamp(), "captureTimestamp needs less than Time.timestamp();");
-
-        // **generate Signature**
-        vm.startPrank(OWNER);
-        iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner1);
-        assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner1));
-        iBTC_networkMiddleware.grantRole(APPROVED_SIGNER, approvedSigner2);
-        assertTrue(iBTC_networkMiddleware.hasRole(APPROVED_SIGNER, approvedSigner2));
-
-        vm.stopPrank();
-        uint256[] memory approvedSignerKeys = new uint256[](2);
-        approvedSignerKeys[0] = approvedSigner1Key;
-        approvedSignerKeys[1] = approvedSigner2Key;
-        uint256 slashIndex = 0;
-
-        bytes[] memory signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
-        // **call slash*
-        vm.startPrank(OWNER);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
-
-        // **excute slash**
-        vm.expectRevert();
-        iBTC_networkMiddleware.executeSlash(0, address(vault), "");
-        vm.warp(Time.timestamp() + 2 days);
-        iBTC_networkMiddleware.executeSlash(0, address(vault), "");
-        vm.stopPrank();
-
-        uint256 amountAfterSlashed = vault.activeBalanceOf(alice);
-        assertEq(amountAfterSlashed, depositAmount - slashAmount, "Cached stake should be reduced by slash amount");
-
-        // **testing veto slash**
-        vm.prank(OWNER);
-        slashIndex++;
-        signatures = _makeSignatures(slashIndex, epoch, alice, slashAmount, approvedSignerKeys);
-        iBTC_networkMiddleware.slash(epoch, alice, slashAmount, signatures);
-        vm.prank(bob);
-        iBTC_slasher.vetoSlash(slashIndex, "");
-
-        uint256 amountAfterVetoSlashed = vault.activeBalanceOf(alice);
-        assertEq(amountAfterVetoSlashed, amountAfterSlashed, "Cached stake should stay the same");
-
-        vm.expectRevert();
-        vm.prank(OWNER);
-        iBTC_networkMiddleware.executeSlash(slashIndex, address(vault), "this slash request sholud have been vetoed");
-    }
-
-    function testGlobalReceiver() public {
-        uint256 slashAmount = 1e9;
-        testSlashAndExecuteOperator();
-
-        burner.triggerTransfer(address(iBTC_globalReceiver));
-        assertEq(iBTC.balanceOf(address(iBTC_globalReceiver)), slashAmount);
-
-        vm.prank(OWNER);
-        iBTC_globalReceiver.redistributeTokens(bob, slashAmount);
-        assertEq(iBTC.balanceOf(bob), slashAmount);
-    }
-
     function testDistributeStakerRewards() public {
         // Setup initial conditions similar to test_DistributeRewards
         uint256 depositAmount = 1e8; // 1 iBTC
@@ -657,6 +531,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
         vm.stopPrank();
 
         // Register vault and operator
@@ -758,6 +633,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
         vm.stopPrank();
 
         // Register vault and operator
@@ -856,6 +732,7 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(OWNER);
         iBTC_delegator.grantRole(NETWORK_LIMIT_SET_ROLE, alice);
         iBTC_delegator.grantRole(OPERATOR_NETWORK_SHARES_SET_ROLE, alice);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
         vm.stopPrank();
 
         // Register vault and operator
@@ -953,6 +830,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 proof = keccak256(abi.encode("test_merkle_root"));
         bytes32 merkleRoot = Hashes.commutativeKeccak256(leaf, proof);
 
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
+        vm.stopPrank();
         // Mint reward tokens
         _mintRewardToken(rewardAmount);
         // Distribute rewards
@@ -969,6 +849,9 @@ contract iBTC_NetworkMiddlewareTest is Test {
         bytes32 proof = keccak256(abi.encode("test_merkle_root"));
         bytes32 merkleRoot = Hashes.commutativeKeccak256(leaf, proof);
 
+        vm.startPrank(OWNER);
+        iBTC_networkMiddleware.grantRole(iBTC_networkMiddleware.REWARD_DISTRIBUTION_ROLE(), OWNER);
+        vm.stopPrank();
         // Mint reward tokens
         for (uint256 i; i < 10; ++i) {
             _mintRewardToken(rewardAmount);
@@ -1093,25 +976,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         assertEq(upgradedContract.getTestVar(), 1e4, "The testVar should be initialized correctly");
     }
 
-    function _makeSignatures(
-        uint256 slashIndex,
-        uint48 epoch,
-        address operator,
-        uint256 slashAmount,
-        uint256[] memory approvedSignerKeys
-    ) internal returns (bytes[] memory signatures) {
-        bytes memory dataToSign = abi.encode(slashIndex, epoch, operator, slashAmount);
-        bytes32 messageHash = keccak256(dataToSign);
-
-        signatures = new bytes[](approvedSignerKeys.length);
-
-        for (uint256 i = 0; i < approvedSignerKeys.length; i++) {
-            signatures[i] = _signMessage(approvedSignerKeys[i], messageHash);
-        }
-
-        return signatures;
-    }
-
     function _signMessage(uint256 signerPrivateKey, bytes32 messageHash) internal pure returns (bytes memory) {
         bytes32 ethSignedMessageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, ethSignedMessageHash);
@@ -1128,11 +992,6 @@ contract iBTC_NetworkMiddlewareTest is Test {
         vm.startPrank(user);
         defaultStakerRewards.setAdminFee(adminFee);
         vm.stopPrank();
-    }
-
-    function _setResolver(uint96 identifier, address resolver) internal {
-        vm.prank(NETWORK);
-        iBTC_slasher.setResolver(identifier, resolver, "");
     }
 
     function _setMaxNetworkLimit(address user, uint96 identifier, uint256 amount) internal {

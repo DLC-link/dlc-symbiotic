@@ -7,15 +7,17 @@ import {IDefaultOperatorRewards} from "rewards/src/contracts/defaultOperatorRewa
 import {IDefaultStakerRewardsFactory} from "rewards/src/contracts/defaultStakerRewards/DefaultStakerRewardsFactory.sol";
 import {IDefaultOperatorRewardsFactory} from
     "rewards/src/contracts/defaultOperatorRewards/DefaultOperatorRewardsFactory.sol";
+import {ReadFile} from "./libs/ReadFile.sol";
 
 contract DeployRewards is Script {
-    address constant DEFAULT_STAKER_REWARDS_FACTORY = 0x70C618a13D1A57f7234c0b893b9e28C5cA8E7f37;
-    address constant DEFAULT_OPERATOR_REWARDS_FACTORY = 0x8D6C873cb7ffa6BE615cE1D55801a9417Ed55f9B;
+    address DEFAULT_STAKER_REWARDS_FACTORY;
+    address DEFAULT_OPERATOR_REWARDS_FACTORY;
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
 
-    function run(
-        address vault
-    ) external {
+    function run(uint256 _chainId, address vault) external {
+        ReadFile readFile = new ReadFile();
+        DEFAULT_STAKER_REWARDS_FACTORY = readFile.readInput(_chainId, "symbiotic", "DEFAULT_STAKER_REWARDS_FACTORY");
+        DEFAULT_OPERATOR_REWARDS_FACTORY = readFile.readInput(_chainId, "symbiotic", "DEFAULT_OPERATOR_REWARDS_FACTORY");
         vm.startBroadcast();
         address defaultStakerRewards_ = IDefaultStakerRewardsFactory(DEFAULT_STAKER_REWARDS_FACTORY).create(
             IDefaultStakerRewards.InitParams({

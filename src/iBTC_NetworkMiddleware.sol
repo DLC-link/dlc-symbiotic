@@ -96,6 +96,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     uint48 public EPOCH_DURATION;
     uint48 public SLASHING_WINDOW;
     uint48 public START_TIME;
+    bytes32 public constant REWARD_DISTRIBUTION_ROLE = keccak256("REWARD_DISTRIBUTION_ROLE");
 
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
@@ -157,7 +158,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         _checkNonZeroAddress(_owner, "ZeroOwner");
         _checkNonZeroAddress(_stakerReward, "ZeroStakerReward");
         _checkNonZeroAddress(_operatorReward, "ZeroOperatorReward");
-        _checkNonZeroAddress(_rewardToken, "ZeroRewardToken");
 
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
@@ -336,6 +336,12 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         subnetworksCnt = _subnetworksCnt;
     }
 
+    function setRewardToken(
+        address _rewardToken
+    ) external onlyOwner {
+        REWARD_TOKEN = _rewardToken;
+    }
+
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
         if (totalStakeCached[epoch]) {
             return operatorStakeCache[epoch][operator];
@@ -403,56 +409,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         }
     }
 
-    function slash(
-        uint48 epoch,
-        address operator,
-        uint256 amount,
-        bytes[] calldata signatures
-    ) public onlyMultisig(abi.encode(slashIndex, epoch, operator, amount), signatures) updateStakeCache(epoch) {
-        uint48 epochStartTs = getEpochStartTs(epoch);
-
-        if (epochStartTs < Time.timestamp() - SLASHING_WINDOW) {
-            revert TooOldEpoch();
-        }
-
-        uint256 totalOperatorStake = getOperatorStake(operator, epoch);
-
-        if (totalOperatorStake < amount) {
-            revert TooBigSlashAmount();
-        }
-
-        // simple pro-rata slasher
-        for (uint256 i; i < vaults.length(); ++i) {
-            (address vault, uint48 enabledTime, uint48 disabledTime) = vaults.atWithTimes(i);
-
-            // just skip the vault if it was enabled after the target epoch or not enabled
-            if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
-                continue;
-            }
-            for (uint96 j = 0; j < subnetworksCnt; ++j) {
-                bytes32 subnetwork = NETWORK.subnetwork(j);
-                uint256 vaultStake =
-                    IBaseDelegator(IVault(vault).delegator()).stakeAt(subnetwork, operator, epochStartTs, new bytes(0));
-                _slashVault(epochStartTs, vault, subnetwork, operator, (amount * vaultStake) / totalOperatorStake);
-                slashedInfos[slashIndex++] =
-                    SlashedInfo({epoch: epoch, operator: operator, slashedAmount: amount, timeStamp: block.timestamp});
-            }
-        }
-    }
-
-    function executeSlash(
-        uint256 slashIndex_,
-        address vault,
-        bytes calldata hints
-    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
-        address slasher = IVault(vault).slasher();
-        uint256 slasherType = IEntity(slasher).TYPE();
-        if (slasherType != VETO_SLASHER_TYPE) {
-            revert NotVetoSlasher();
-        }
-        IVetoSlasher(slasher).executeSlash(slashIndex_, hints);
-    }
-
     function calcAndCacheStakes(
         uint48 epoch
     ) public returns (uint256 totalStake) {
@@ -491,7 +447,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint256 maxAdminFee,
         bytes calldata activeSharesHint,
         bytes calldata activeStakeHint
-    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+    ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
 
@@ -520,7 +476,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     function distributeOperatorRewards(
         uint256 distributeAmount,
         bytes32 merkleRoot
-    ) public onlyOwner updateStakeCache(getCurrentEpoch()) {
+    ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }
