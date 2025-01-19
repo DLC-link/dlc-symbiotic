@@ -41,6 +41,8 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error ZeroRewardToken();
     error ZeroEpochDuration();
     error ZeroSlashingWindow();
+    error ZeroStakerReward();
+    error ZeroOperatorNetOptin();
 
     error NotOperator();
     error NotVault();
@@ -141,13 +143,33 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         __Ownable_init(_owner);
         MultisigValidated.initialize(_owner, _minimumThreshold, _threshold);
 
-        _checkNonZeroAddress(_network, "ZeroNetwork");
-        _checkNonZeroAddress(_operatorRegistry, "ZeroOperatorRegistry");
-        _checkNonZeroAddress(_vaultRegistry, "ZeroVaultRegistry");
-        _checkNonZeroAddress(_operatorNetOptin, "ZeroOperatorNetOptin");
-        _checkNonZeroAddress(_owner, "ZeroOwner");
-        _checkNonZeroAddress(_stakerReward, "ZeroStakerReward");
-        _checkNonZeroAddress(_operatorReward, "ZeroOperatorReward");
+        if (_network == address(0)) {
+            revert ZeroNetwork();
+        }
+
+        if (_operatorRegistry == address(0)) {
+            revert ZeroOperatorRegistry();
+        }
+
+        if (_vaultRegistry == address(0)) {
+            revert ZeroVaultRegistry();
+        }
+
+        if (_operatorNetOptin == address(0)) {
+            revert ZeroOperatorNetOptin();
+        }
+
+        if (_owner == address(0)) {
+            revert ZeroOwner();
+        }
+
+        if (_stakerReward == address(0)) {
+            revert ZeroStakerReward();
+        }
+
+        if (_operatorReward == address(0)) {
+            revert ZeroOperatorReward();
+        }
 
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
@@ -508,12 +530,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
 
     function _wasActiveAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
-    }
-
-    function _checkNonZeroAddress(address addr, string memory errorMessage) private pure {
-        if (addr == address(0)) {
-            revert(errorMessage);
-        }
     }
 
     function _slashVault(
