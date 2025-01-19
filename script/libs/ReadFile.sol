@@ -24,7 +24,7 @@ contract ReadFile is Script {
     ) public pure returns (address addr) {
         require(data.length >= 20, "Invalid bytes length");
         assembly {
-            addr := mload(add(data, 32)) // 从偏移量 20 开始读取地址
+            addr := mload(add(data, 32))
         }
     }
 }
