@@ -41,6 +41,8 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error ZeroRewardToken();
     error ZeroEpochDuration();
     error ZeroSlashingWindow();
+    error ZeroStakerReward();
+    error ZeroOperatorNetOptin();
 
     error NotOperator();
     error NotVault();
@@ -61,9 +63,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error InvalidEpoch();
 
     error SlashingWindowTooShort();
-    error TooBigSlashAmount();
     error UnknownSlasherType();
-    error NotVetoSlasher();
 
     error ZeroTotalStake();
     error ZeroRewardAmount();
@@ -75,13 +75,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     struct ValidatorData {
         uint256 stake;
         bytes32 key;
-    }
-
-    struct SlashedInfo {
-        uint48 epoch;
-        address operator;
-        uint256 slashedAmount;
-        uint256 timeStamp;
     }
 
     address public NETWORK;
@@ -96,14 +89,13 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     uint48 public EPOCH_DURATION;
     uint48 public SLASHING_WINDOW;
     uint48 public START_TIME;
-    bytes32 public constant REWARD_DISTRIBUTION_ROLE = keccak256("REWARD_DISTRIBUTION_ROLE");
+    bytes32 public constant REWARD_DISTRIBUTION_ROLE =
+        0x9f89a45310bee56665a077229020c3130eedbd18bff771c3dc399fb850b2e12f; // keccak256("REWARD_DISTRIBUTION_ROLE");
 
     uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
-    uint256 public slashIndex;
     uint256 public subnetworksCnt;
-    mapping(uint256 slashIndex => SlashedInfo) slashedInfos;
     mapping(uint48 => uint256) public totalStakeCache;
     mapping(uint48 => bool) public totalStakeCached;
     mapping(uint48 epoch => mapping(address operator => uint256 amounts)) public operatorStakeCache;
@@ -151,13 +143,33 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         __Ownable_init(_owner);
         MultisigValidated.initialize(_owner, _minimumThreshold, _threshold);
 
-        _checkNonZeroAddress(_network, "ZeroNetwork");
-        _checkNonZeroAddress(_operatorRegistry, "ZeroOperatorRegistry");
-        _checkNonZeroAddress(_vaultRegistry, "ZeroVaultRegistry");
-        _checkNonZeroAddress(_operatorNetOptin, "ZeroOperatorNetOptin");
-        _checkNonZeroAddress(_owner, "ZeroOwner");
-        _checkNonZeroAddress(_stakerReward, "ZeroStakerReward");
-        _checkNonZeroAddress(_operatorReward, "ZeroOperatorReward");
+        if (_network == address(0)) {
+            revert ZeroNetwork();
+        }
+
+        if (_operatorRegistry == address(0)) {
+            revert ZeroOperatorRegistry();
+        }
+
+        if (_vaultRegistry == address(0)) {
+            revert ZeroVaultRegistry();
+        }
+
+        if (_operatorNetOptin == address(0)) {
+            revert ZeroOperatorNetOptin();
+        }
+
+        if (_owner == address(0)) {
+            revert ZeroOwner();
+        }
+
+        if (_stakerReward == address(0)) {
+            revert ZeroStakerReward();
+        }
+
+        if (_operatorReward == address(0)) {
+            revert ZeroOperatorReward();
+        }
 
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
@@ -518,12 +530,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
 
     function _wasActiveAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
-    }
-
-    function _checkNonZeroAddress(address addr, string memory errorMessage) private pure {
-        if (addr == address(0)) {
-            revert(errorMessage);
-        }
     }
 
     function _slashVault(

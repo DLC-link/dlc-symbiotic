@@ -3,12 +3,14 @@ ast = true
 build_info = true
 extra_output = ["storageLayout"]
 ffi = true
-fs_permissions = [{access = "read", path = "script/addresses"}]
+fs_permissions = [{ access = "read", path = "script/addresses" }]
 libs = ["lib"]
 out = "out"
 solc = "0.8.25"
 src = "src"
 via_ir = true
+optimizer = true
+optimizer-runs = 200
 
 [fmt]
 bracket_spacing = false
