@@ -2,9 +2,19 @@
 
 Repository for the dlc-link Symbiotic integration.
 
-### Slashing
+## Development
 
-<img src="./assets/slash_flow.png" alt="slash_flow" width="100%" />
+### Build
+
+```shell
+$ forge build
+```
+
+### Test
+
+```shell
+$ forge test
+```
 
 ## Usage
 
@@ -20,60 +30,10 @@ And deploy the NetworkMiddleware contract using:
 forge script SetupNetworkMiddleware --rpc-url http://localhost:8545 --broadcast -vvvv --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
 
-
-## Workflow and Dependencies 
+## Workflow and Dependencies
 
 <img src="./assets/workflow_and_dependencies.png" alt="workflow_and_dependencies" width="100%" />
 
+### Slashing
 
-## Development
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+<img src="./assets/slash_flow.png" alt="slash_flow" width="100%" />

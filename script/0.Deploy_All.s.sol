@@ -46,7 +46,7 @@ contract DeployAll is Script {
     address VAULT_FACTORY;
     address DELEGATOR_FACTORY;
     address SLASHER_FACTORY;
-    address NEWTORK_OPTIN_SERVICE;
+    address NETWORK_OPTIN_SERVICE;
     address VAULT_OPTIN_SERVICE;
     address DEFAULT_STAKER_REWARDS_FACTORY;
     address DEFAULT_OPERATOR_REWARDS_FACTORY;
@@ -96,6 +96,7 @@ contract DeployAll is Script {
 
     ProxyAdmin public proxyAdmin;
     TransparentUpgradeableProxy public proxy;
+    TransparentUpgradeableProxy private gr_proxy;
 
     function run(
         uint256 _chainId
@@ -104,11 +105,11 @@ contract DeployAll is Script {
         NETWORK_MIDDLEWARE_SERVICE = readFile.readInput(_chainId, "symbiotic", "NETWORK_MIDDLEWARE_SERVICE");
         NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
         OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
-        COLLATERAL = readFile.readInput(_chainId, "symbiotic", "COLLATERAL");
+        COLLATERAL = readFile.readInput(_chainId, "iBTC", "COLLATERAL");
         VAULT_FACTORY = readFile.readInput(_chainId, "symbiotic", "VAULT_FACTORY");
         DELEGATOR_FACTORY = readFile.readInput(_chainId, "symbiotic", "DELEGATOR_FACTORY");
         SLASHER_FACTORY = readFile.readInput(_chainId, "symbiotic", "SLASHER_FACTORY");
-        NEWTORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NEWTORK_OPTIN_SERVICE");
+        NETWORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NETWORK_OPTIN_SERVICE");
         VAULT_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "VAULT_OPTIN_SERVICE");
         DEFAULT_STAKER_REWARDS_FACTORY = readFile.readInput(_chainId, "symbiotic", "DEFAULT_STAKER_REWARDS_FACTORY");
         DEFAULT_OPERATOR_REWARDS_FACTORY = readFile.readInput(_chainId, "symbiotic", "DEFAULT_OPERATOR_REWARDS_FACTORY");
@@ -124,8 +125,14 @@ contract DeployAll is Script {
         //  ---------------------------------- Start Vault Deployment ----------------------------------
 
         // ------------------------------- Start Global Receiver Deployment -------------------------------
-        iBTC_globalReceiver = new iBTC_GlobalReceiver();
-        iBTC_globalReceiver.initialize(COLLATERAL, OWNER);
+        iBTC_GlobalReceiver grImplementation = new iBTC_GlobalReceiver();
+        gr_proxy = new TransparentUpgradeableProxy(
+            address(grImplementation),
+            OWNER,
+            abi.encodeWithSelector(iBTC_GlobalReceiver.initialize.selector, COLLATERAL, OWNER)
+        );
+        proxyAdmin = ProxyAdmin(_getAdminAddress(address(gr_proxy)));
+        iBTC_globalReceiver = iBTC_GlobalReceiver(address(gr_proxy));
         // ------------------------------- End Global Receiver Deployment -------------------------------
 
         // ------------------------------- Start Vault Configurator Deployment -------------------------------
@@ -234,7 +241,7 @@ contract DeployAll is Script {
                 NETWORK,
                 OPERATOR_REGISTRY,
                 VAULT_FACTORY,
-                NEWTORK_OPTIN_SERVICE,
+                NETWORK_OPTIN_SERVICE,
                 OWNER,
                 STAKER_REWARDS,
                 OPERATOR_REWARDS,
