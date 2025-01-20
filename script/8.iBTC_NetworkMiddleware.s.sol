@@ -14,7 +14,8 @@ contract DeployNetworkMiddleware is Script {
     address NETWORK_OPTIN_SERVICE;
     address VAULT_FACTORY;
 
-    address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
+    // address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
+    address constant OWNER = 0x442691Af617ce33878b0864501Ab74161870856f; //NOTE: DLC.Link Medium Admin Multisig
 
     /*
     Notes:

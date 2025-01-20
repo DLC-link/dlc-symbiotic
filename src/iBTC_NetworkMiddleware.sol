@@ -37,11 +37,8 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error ZeroNetwork();
     error ZeroOperatorRegistry();
     error ZeroVaultRegistry();
-    error ZeroOperatorReward();
-    error ZeroRewardToken();
     error ZeroEpochDuration();
     error ZeroSlashingWindow();
-    error ZeroStakerReward();
     error ZeroOperatorNetOptin();
 
     error NotOperator();
@@ -51,7 +48,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error OperatorNotRegistred();
     error OperarorGracePeriodNotPassed();
     error OperatorAlreadyRegistred();
-    error OperatorNotEnoughStaked();
 
     error VaultAlreadyRegistred();
     error VaultEpochTooShort();
@@ -66,7 +62,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error OperatorRewardNotSet();
 
     error SlashingWindowTooShort();
-    error UnknownSlasherType();
 
     error ZeroTotalStake();
     error ZeroRewardAmount();
@@ -84,7 +79,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     address public OPERATOR_REGISTRY;
     address public VAULT_REGISTRY;
     address public OPERATOR_NET_OPTIN;
-    address public OPERATOR_VAULT_OPTIN;
     address public OWNER;
     address public STAKER_REWARDS;
     address public OPERATOR_REWARDS;
@@ -95,7 +89,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     bytes32 public constant REWARD_DISTRIBUTION_ROLE =
         0x9f89a45310bee56665a077229020c3130eedbd18bff771c3dc399fb850b2e12f; // keccak256("REWARD_DISTRIBUTION_ROLE");
 
-    uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
     uint256 public subnetworksCnt;
@@ -117,7 +110,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     event OperatorRewardsSet(address operatorRewards);
 
     ////////////////////////////////////////////////////////////////
-    //                        MODIFIERS                          //
+    //                        MODIFIERS                           //
     ////////////////////////////////////////////////////////////////
     modifier updateStakeCache(
         uint48 epoch
@@ -128,6 +121,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         _;
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                          SETUP                             //
+    ////////////////////////////////////////////////////////////////
     constructor() {
         _disableInitializers();
     }
@@ -194,6 +190,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         subnetworksCnt = 1;
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                        GETTERS                             //
+    ////////////////////////////////////////////////////////////////
     function getEpochStartTs(
         uint48 epoch
     ) public view returns (uint48 timestamp) {
@@ -236,6 +235,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         return getEpochAtTs(Time.timestamp());
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                        ADMINISTRATION                      //
+    ////////////////////////////////////////////////////////////////
     function registerOperator(address operator, bytes32 key) external onlyOwner {
         if (operators.contains(operator)) {
             revert OperatorAlreadyRegistred();
@@ -367,6 +369,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         emit OperatorRewardsSet(_operatorRewards);
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                     STAKE AND OPS                          //
+    ////////////////////////////////////////////////////////////////
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
         if (totalStakeCached[epoch]) {
             return operatorStakeCache[epoch][operator];
