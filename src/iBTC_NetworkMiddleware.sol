@@ -62,6 +62,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error TooOldEpoch();
     error InvalidEpoch();
 
+    error StakerRewardNotSet();
+    error OperatorRewardNotSet();
+
     error SlashingWindowTooShort();
     error UnknownSlasherType();
 
@@ -109,6 +112,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ////////////////////////////////////////////////////////////////
     event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
     event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
+    event RewardTokenSet(address rewardToken);
+    event StakerRewardsSet(address stakerRewards);
+    event OperatorRewardsSet(address operatorRewards);
 
     ////////////////////////////////////////////////////////////////
     //                        MODIFIERS                          //
@@ -344,18 +350,21 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         address _rewardToken
     ) external onlyOwner {
         REWARD_TOKEN = _rewardToken;
+        emit RewardTokenSet(_rewardToken);
     }
 
     function setStakerRewards(
         address _stakerRewards
     ) external onlyOwner {
         STAKER_REWARDS = _stakerRewards;
+        emit StakerRewardsSet(_stakerRewards);
     }
 
     function setOperatorRewards(
         address _operatorRewards
     ) external onlyOwner {
         OPERATOR_REWARDS = _operatorRewards;
+        emit OperatorRewardsSet(_operatorRewards);
     }
 
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
@@ -464,6 +473,10 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         bytes calldata activeSharesHint,
         bytes calldata activeStakeHint
     ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
+        if (STAKER_REWARDS == address(0)) {
+            revert StakerRewardNotSet();
+        }
+
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
 
@@ -493,6 +506,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint256 distributeAmount,
         bytes32 merkleRoot
     ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
+        if (OPERATOR_REWARDS == address(0)) {
+            revert OperatorRewardNotSet();
+        }
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }
