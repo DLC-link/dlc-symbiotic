@@ -48,7 +48,7 @@ contract DeployNetworkMiddleware is Script {
     function run(uint256 _chainId, address NETWORK) external {
         ReadFile readFile = new ReadFile();
         OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
-        NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
+        // NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
         NETWORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NETWORK_OPTIN_SERVICE");
         VAULT_FACTORY = readFile.readInput(_chainId, "symbiotic", "VAULT_FACTORY");
 
