@@ -13,7 +13,7 @@ contract DeployNetworkMiddleware is Script {
     address NETWORK_REGISTRY;
     address NETWORK_OPTIN_SERVICE;
     address VAULT_FACTORY;
-    address REWARD_TOKEN;
+
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
 
     /*
@@ -44,7 +44,7 @@ contract DeployNetworkMiddleware is Script {
     TransparentUpgradeableProxy private proxy;
     NetworkMiddleware private iBTC_networkMiddleware;
 
-    function run(uint256 _chainId, address NETWORK, address STAKER_REWARDS, address OPERATOR_REWARDS) external {
+    function run(uint256 _chainId, address NETWORK) external {
         ReadFile readFile = new ReadFile();
         OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
         NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
@@ -63,9 +63,9 @@ contract DeployNetworkMiddleware is Script {
                 VAULT_FACTORY,
                 NETWORK_OPTIN_SERVICE,
                 OWNER,
-                STAKER_REWARDS,
-                OPERATOR_REWARDS,
-                REWARD_TOKEN,
+                address(0), // STAKER_REWARDS
+                address(0), // OPERATOR_REWARDS
+                address(0), // REWARD_TOKEN
                 NETWORK_EPOCH,
                 SLASHING_WINDOW,
                 threshold,

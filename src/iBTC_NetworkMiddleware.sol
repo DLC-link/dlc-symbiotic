@@ -163,14 +163,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             revert ZeroOwner();
         }
 
-        if (_stakerReward == address(0)) {
-            revert ZeroStakerReward();
-        }
-
-        if (_operatorReward == address(0)) {
-            revert ZeroOperatorReward();
-        }
-
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
@@ -352,6 +344,18 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         address _rewardToken
     ) external onlyOwner {
         REWARD_TOKEN = _rewardToken;
+    }
+
+    function setStakerRewards(
+        address _stakerRewards
+    ) external onlyOwner {
+        STAKER_REWARDS = _stakerRewards;
+    }
+
+    function setOperatorRewards(
+        address _operatorRewards
+    ) external onlyOwner {
+        OPERATOR_REWARDS = _operatorRewards;
     }
 
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
