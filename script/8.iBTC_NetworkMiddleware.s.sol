@@ -11,8 +11,9 @@ import {ReadFile} from "./libs/ReadFile.sol";
 contract DeployNetworkMiddleware is Script {
     address OPERATOR_REGISTRY;
     address NETWORK_REGISTRY;
-    address NEWTORK_OPTIN_SERVICE;
+    address NETWORK_OPTIN_SERVICE;
     address VAULT_FACTORY;
+    address REWARD_TOKEN;
     address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
 
     /*
@@ -48,12 +49,12 @@ contract DeployNetworkMiddleware is Script {
         address NETWORK,
         address STAKER_REWARDS,
         address OPERATOR_REWARDS,
-        address REWARD_TOKEN
+        address REWARD_TOKENn
     ) external {
         ReadFile readFile = new ReadFile();
         OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
         NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
-        NEWTORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NEWTORK_OPTIN_SERVICE");
+        NETWORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NETWORK_OPTIN_SERVICE");
         VAULT_FACTORY = readFile.readInput(_chainId, "symbiotic", "VAULT_FACTORY");
 
         vm.startBroadcast();
@@ -66,7 +67,7 @@ contract DeployNetworkMiddleware is Script {
                 NETWORK,
                 OPERATOR_REGISTRY,
                 VAULT_FACTORY,
-                NEWTORK_OPTIN_SERVICE,
+                NETWORK_OPTIN_SERVICE,
                 OWNER,
                 STAKER_REWARDS,
                 OPERATOR_REWARDS,

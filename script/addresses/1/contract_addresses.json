@@ -1,0 +1,82 @@
+{
+    "iBTC": {
+        "contracts": {
+            "COLLATERAL": {
+                "address": "0x050C24dBf1eEc17babE5fc585F06116A259CC77A",
+                "description": "iBTC token"
+            }
+        }
+    },
+    "symbiotic": {
+        "contracts": {
+            "NETWORK_MIDDLEWARE_SERVICE": {
+                "address": "0xD7dC9B366c027743D90761F71858BCa83C6899Ad",
+                "description": "Standalone contract for network middleware services"
+            },
+            "OPERATOR_VAULT_OPTIN_SERVICE": {
+                "address": "0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891",
+                "description": "Standalone contract for operators opting into vaults"
+            },
+            "OPERATOR_NETWORK_OPTIN_SERVICE": {
+                "address": "0x7133415b33B438843D581013f98A08704316633c",
+                "description": "Standalone contract for operators opting into networks"
+            },
+            "NETWORK_REGISTRY": {
+                "address": "0xC773b1011461e7314CF05f97d95aa8e92C1Fd8aA",
+                "description": "Standalone contract for managing network registries"
+            },
+            "OPERATOR_REGISTRY": {
+                "address": "0xAd817a6Bc954F678451A71363f04150FDD81Af9F",
+                "description": "Standalone contract for managing operator registries"
+            },
+            "NETWORK_RESTAKE_DELEGATOR": {
+                "address": "0xc583e3E488C3CD8738850e2E7B19eF3f23e82e8A",
+                "description": "Implementation contract for network restake delegators"
+            },
+            "FULL_RESTAKE_DELEGATOR": {
+                "address": "0x1e006130f9Cf60E9C64942cf468E78F2f2a0E3F2",
+                "description": "Implementation contract for full restake delegators"
+            },
+            "OPERATOR_NETWORK_SPECIFIC_DELEGATOR": {
+                "address": "0x89391B703223511796F0778F0838E68Da66D90Fb",
+                "description": "Implementation contract for operator network-specific delegators"
+            },
+            "OPERATOR_SPECIFIC_DELEGATOR": {
+                "address": "0xEF91D6730688b2966b959383A1B42Aa23130Aedf",
+                "description": "Implementation contract for operator-specific delegators"
+            },
+            "SLASHER": {
+                "address": "0x4e6aE579b43B7DE1fc4CEd1DfB155714176c85fb",
+                "description": "Implementation contract for slasher functionality"
+            },
+            "VETO_SLASHER": {
+                "address": "0xAE5Bb0C1b2f5d8fc077b2451E23439Ed88c458cc",
+                "description": "Implementation contract for veto slasher functionality"
+            },
+            "VAULT": {
+                "address": "0xDd649AdaB2e67cAdC2EC29d75ABe73f3Df08065c",
+                "description": "Implementation contract for vault functionality"
+            },
+            "VAULT_TOKENIZED": {
+                "address": "0x5a0dC8e73d6846f12630b8f7D5197FA8Cf669cfe",
+                "description": "Implementation contract for tokenized vaults"
+            },
+            "DELEGATOR_FACTORY": {
+                "address": "0x985Ed57AF9D475f1d83c1c1c8826A0E5A34E8C7B",
+                "description": "Factory contract for creating delegators"
+            },
+            "SLASHER_FACTORY": {
+                "address": "0x685c2eD7D59814d2a597409058Ee7a92F21e48Fd",
+                "description": "Factory contract for creating slashers"
+            },
+            "VAULT_FACTORY": {
+                "address": "0xAEb6bdd95c502390db8f52c8909F703E9Af6a346",
+                "description": "Factory contract for creating vaults"
+            },
+            "VAULT_CONFIGURATOR": {
+                "address": "0x29300b1d3150B4E2b12fE80BE72f365E200441EC",
+                "description": "Factory contract for configuring vaults"
+            }
+        }
+    }
+}
