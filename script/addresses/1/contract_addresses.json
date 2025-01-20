@@ -13,11 +13,11 @@
                 "address": "0xD7dC9B366c027743D90761F71858BCa83C6899Ad",
                 "description": "Standalone contract for network middleware services"
             },
-            "OPERATOR_VAULT_OPTIN_SERVICE": {
+            "VAULT_OPTIN_SERVICE": {
                 "address": "0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891",
                 "description": "Standalone contract for operators opting into vaults"
             },
-            "OPERATOR_NETWORK_OPTIN_SERVICE": {
+            "NETWORK_OPTIN_SERVICE": {
                 "address": "0x7133415b33B438843D581013f98A08704316633c",
                 "description": "Standalone contract for operators opting into networks"
             },
