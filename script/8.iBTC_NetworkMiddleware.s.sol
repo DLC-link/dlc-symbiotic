@@ -44,13 +44,7 @@ contract DeployNetworkMiddleware is Script {
     TransparentUpgradeableProxy private proxy;
     NetworkMiddleware private iBTC_networkMiddleware;
 
-    function run(
-        uint256 _chainId,
-        address NETWORK,
-        address STAKER_REWARDS,
-        address OPERATOR_REWARDS,
-        address REWARD_TOKENn
-    ) external {
+    function run(uint256 _chainId, address NETWORK, address STAKER_REWARDS, address OPERATOR_REWARDS) external {
         ReadFile readFile = new ReadFile();
         OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
         NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
