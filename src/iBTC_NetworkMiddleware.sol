@@ -4,12 +4,10 @@ pragma solidity 0.8.25;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {MultisigValidated} from "./libraries/MultisigValidated.sol";
 import {SimpleKeyRegistry32} from "./libraries/SimpleKeyRegistry32.sol";
 import {MapWithTimeData} from "./libraries/MapWithTimeData.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IDefaultOperatorRewards} from "rewards/src/interfaces/defaultOperatorRewards/IDefaultOperatorRewards.sol";
 import {IDefaultStakerRewards} from "rewards/src/interfaces/defaultStakerRewards/IDefaultStakerRewards.sol";
@@ -17,9 +15,7 @@ import {IRegistry} from "@symbiotic/interfaces/common/IRegistry.sol";
 import {IEntity} from "@symbiotic/interfaces/common/IEntity.sol";
 import {IVault} from "@symbiotic/interfaces/vault/IVault.sol";
 import {IBaseDelegator} from "@symbiotic/interfaces/delegator/IBaseDelegator.sol";
-import {IBaseSlasher} from "@symbiotic/interfaces/slasher/IBaseSlasher.sol";
 import {IOptInService} from "@symbiotic/interfaces/service/IOptInService.sol";
-import {ISlasher} from "@symbiotic/interfaces/slasher/ISlasher.sol";
 import {IVetoSlasher} from "@symbiotic/interfaces/slasher/IVetoSlasher.sol";
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Subnetwork} from "@symbiotic/contracts/libraries/Subnetwork.sol";
@@ -37,11 +33,8 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error ZeroNetwork();
     error ZeroOperatorRegistry();
     error ZeroVaultRegistry();
-    error ZeroOperatorReward();
-    error ZeroRewardToken();
     error ZeroEpochDuration();
     error ZeroSlashingWindow();
-    error ZeroStakerReward();
     error ZeroOperatorNetOptin();
 
     error NotOperator();
@@ -51,7 +44,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error OperatorNotRegistred();
     error OperarorGracePeriodNotPassed();
     error OperatorAlreadyRegistred();
-    error OperatorNotEnoughStaked();
 
     error VaultAlreadyRegistred();
     error VaultEpochTooShort();
@@ -62,8 +54,10 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error TooOldEpoch();
     error InvalidEpoch();
 
+    error StakerRewardNotSet();
+    error OperatorRewardNotSet();
+
     error SlashingWindowTooShort();
-    error UnknownSlasherType();
 
     error ZeroTotalStake();
     error ZeroRewardAmount();
@@ -81,7 +75,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     address public OPERATOR_REGISTRY;
     address public VAULT_REGISTRY;
     address public OPERATOR_NET_OPTIN;
-    address public OPERATOR_VAULT_OPTIN;
     address public OWNER;
     address public STAKER_REWARDS;
     address public OPERATOR_REWARDS;
@@ -92,7 +85,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     bytes32 public constant REWARD_DISTRIBUTION_ROLE =
         0x9f89a45310bee56665a077229020c3130eedbd18bff771c3dc399fb850b2e12f; // keccak256("REWARD_DISTRIBUTION_ROLE");
 
-    uint48 private constant INSTANT_SLASHER_TYPE = 0;
     uint48 private constant VETO_SLASHER_TYPE = 1;
 
     uint256 public subnetworksCnt;
@@ -109,9 +101,12 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ////////////////////////////////////////////////////////////////
     event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
     event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
+    event RewardTokenSet(address rewardToken);
+    event StakerRewardsSet(address stakerRewards);
+    event OperatorRewardsSet(address operatorRewards);
 
     ////////////////////////////////////////////////////////////////
-    //                        MODIFIERS                          //
+    //                        MODIFIERS                           //
     ////////////////////////////////////////////////////////////////
     modifier updateStakeCache(
         uint48 epoch
@@ -122,6 +117,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         _;
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                          SETUP                             //
+    ////////////////////////////////////////////////////////////////
     constructor() {
         _disableInitializers();
     }
@@ -163,14 +161,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             revert ZeroOwner();
         }
 
-        if (_stakerReward == address(0)) {
-            revert ZeroStakerReward();
-        }
-
-        if (_operatorReward == address(0)) {
-            revert ZeroOperatorReward();
-        }
-
         if (_slashingWindow < _epochDuration) {
             revert SlashingWindowTooShort();
         }
@@ -196,6 +186,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         subnetworksCnt = 1;
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                        GETTERS                             //
+    ////////////////////////////////////////////////////////////////
     function getEpochStartTs(
         uint48 epoch
     ) public view returns (uint48 timestamp) {
@@ -238,6 +231,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         return getEpochAtTs(Time.timestamp());
     }
 
+    ////////////////////////////////////////////////////////////////
+    //                        ADMINISTRATION                      //
+    ////////////////////////////////////////////////////////////////
     function registerOperator(address operator, bytes32 key) external onlyOwner {
         if (operators.contains(operator)) {
             revert OperatorAlreadyRegistred();
@@ -352,8 +348,26 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         address _rewardToken
     ) external onlyOwner {
         REWARD_TOKEN = _rewardToken;
+        emit RewardTokenSet(_rewardToken);
     }
 
+    function setStakerRewards(
+        address _stakerRewards
+    ) external onlyOwner {
+        STAKER_REWARDS = _stakerRewards;
+        emit StakerRewardsSet(_stakerRewards);
+    }
+
+    function setOperatorRewards(
+        address _operatorRewards
+    ) external onlyOwner {
+        OPERATOR_REWARDS = _operatorRewards;
+        emit OperatorRewardsSet(_operatorRewards);
+    }
+
+    ////////////////////////////////////////////////////////////////
+    //                     STAKE AND OPS                          //
+    ////////////////////////////////////////////////////////////////
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
         if (totalStakeCached[epoch]) {
             return operatorStakeCache[epoch][operator];
@@ -460,6 +474,10 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         bytes calldata activeSharesHint,
         bytes calldata activeStakeHint
     ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
+        if (STAKER_REWARDS == address(0)) {
+            revert StakerRewardNotSet();
+        }
+
         uint48 epoch = getEpochAtTs(timestamp);
         uint256 totalStake = getTotalStake(epoch);
 
@@ -489,6 +507,9 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         uint256 distributeAmount,
         bytes32 merkleRoot
     ) public onlyRole(REWARD_DISTRIBUTION_ROLE) updateStakeCache(getCurrentEpoch()) {
+        if (OPERATOR_REWARDS == address(0)) {
+            revert OperatorRewardNotSet();
+        }
         if (distributeAmount == 0) {
             revert ZeroRewardAmount();
         }
@@ -530,23 +551,5 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
 
     function _wasActiveAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
-    }
-
-    function _slashVault(
-        uint48 timestamp,
-        address vault,
-        bytes32 subnetwork,
-        address operator,
-        uint256 amount
-    ) private {
-        address slasher = IVault(vault).slasher();
-        uint256 slasherType = IEntity(slasher).TYPE();
-        if (slasherType == INSTANT_SLASHER_TYPE) {
-            ISlasher(slasher).slash(subnetwork, operator, amount, timestamp, new bytes(0));
-        } else if (slasherType == VETO_SLASHER_TYPE) {
-            IVetoSlasher(slasher).requestSlash(subnetwork, operator, amount, timestamp, new bytes(0));
-        } else {
-            revert UnknownSlasherType();
-        }
     }
 }

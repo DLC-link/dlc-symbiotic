@@ -11,9 +11,11 @@ import {ReadFile} from "./libs/ReadFile.sol";
 contract DeployNetworkMiddleware is Script {
     address OPERATOR_REGISTRY;
     address NETWORK_REGISTRY;
-    address NEWTORK_OPTIN_SERVICE;
+    address NETWORK_OPTIN_SERVICE;
     address VAULT_FACTORY;
-    address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
+
+    // address constant OWNER = 0x8Ae0F53A071F5036910509FE48eBB8b3558fa9fD; //NOTE: Rayer's testing account
+    address constant OWNER = 0x442691Af617ce33878b0864501Ab74161870856f; //NOTE: DLC.Link Medium Admin Multisig
 
     /*
     Notes:
@@ -43,17 +45,11 @@ contract DeployNetworkMiddleware is Script {
     TransparentUpgradeableProxy private proxy;
     NetworkMiddleware private iBTC_networkMiddleware;
 
-    function run(
-        uint256 _chainId,
-        address NETWORK,
-        address STAKER_REWARDS,
-        address OPERATOR_REWARDS,
-        address REWARD_TOKEN
-    ) external {
+    function run(uint256 _chainId, address NETWORK) external {
         ReadFile readFile = new ReadFile();
         OPERATOR_REGISTRY = readFile.readInput(_chainId, "symbiotic", "OPERATOR_REGISTRY");
-        NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
-        NEWTORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NEWTORK_OPTIN_SERVICE");
+        // NETWORK_REGISTRY = readFile.readInput(_chainId, "symbiotic", "NETWORK_REGISTRY");
+        NETWORK_OPTIN_SERVICE = readFile.readInput(_chainId, "symbiotic", "NETWORK_OPTIN_SERVICE");
         VAULT_FACTORY = readFile.readInput(_chainId, "symbiotic", "VAULT_FACTORY");
 
         vm.startBroadcast();
@@ -66,11 +62,11 @@ contract DeployNetworkMiddleware is Script {
                 NETWORK,
                 OPERATOR_REGISTRY,
                 VAULT_FACTORY,
-                NEWTORK_OPTIN_SERVICE,
+                NETWORK_OPTIN_SERVICE,
                 OWNER,
-                STAKER_REWARDS,
-                OPERATOR_REWARDS,
-                REWARD_TOKEN,
+                address(0), // STAKER_REWARDS
+                address(0), // OPERATOR_REWARDS
+                address(0), // REWARD_TOKEN
                 NETWORK_EPOCH,
                 SLASHING_WINDOW,
                 threshold,
