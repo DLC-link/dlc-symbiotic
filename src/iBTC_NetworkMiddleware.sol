@@ -387,6 +387,10 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
                 continue;
             }
 
+            if (epochStartTs < Time.timestamp()) {
+                revert TooOldEpoch();
+            }
+
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
                 stake += IBaseDelegator(IVault(vault).delegator()).stakeAt(
                     NETWORK.subnetwork(j), operator, epochStartTs, new bytes(0)
@@ -420,6 +424,10 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             // just skip operator if it was added after the target epoch or paused
             if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
                 continue;
+            }
+
+            if (epochStartTs < Time.timestamp()) {
+                revert TooOldEpoch();
             }
 
             bytes32 key = getOperatorKeyAt(operator, epochStartTs);
