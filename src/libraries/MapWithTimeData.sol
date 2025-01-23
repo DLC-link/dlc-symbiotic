@@ -30,11 +30,6 @@ library MapWithTimeData {
 
         value |= uint256(Time.timestamp()) << 48;
         self.set(addr, value);
-        //NOTE: it fails with the success check
-        // bool success = self.set(addr, value);
-        // if (!success) {
-        //     revert EnableOperationFailed();
-        // }
     }
 
     function enable(EnumerableMap.AddressToUintMap storage self, address addr) internal {
@@ -46,11 +41,6 @@ library MapWithTimeData {
 
         value = uint256(Time.timestamp());
         self.set(addr, value);
-        //NOTE: it fails with the success check
-        // bool success = self.set(addr, value);
-        // if (!success) {
-        //     revert EnableOperationFailed();
-        // }
     }
 
     function atWithTimes(
