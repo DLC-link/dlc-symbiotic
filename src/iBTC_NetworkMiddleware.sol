@@ -41,11 +41,11 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     error NotVault();
 
     error OperatorNotOptedIn();
-    error OperatorNotRegistred();
+    error OperatorNotRegistered();
     error OperarorGracePeriodNotPassed();
-    error OperatorAlreadyRegistred();
+    error OperatorAlreadyRegistered();
 
-    error VaultAlreadyRegistred();
+    error VaultAlreadyRegistered();
     error VaultEpochTooShort();
     error VaultGracePeriodNotPassed();
 
@@ -247,7 +247,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ////////////////////////////////////////////////////////////////
     function registerOperator(address operator, bytes32 key) external onlyOwner {
         if (operators.contains(operator)) {
-            revert OperatorAlreadyRegistred();
+            revert OperatorAlreadyRegistered();
         }
 
         if (!IRegistry(OPERATOR_REGISTRY).isEntity(operator)) {
@@ -266,7 +266,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
 
     function updateOperatorKey(address operator, bytes32 key) external onlyOwner {
         if (!operators.contains(operator)) {
-            revert OperatorNotRegistred();
+            revert OperatorNotRegistered();
         }
 
         updateKey(operator, key);
@@ -304,7 +304,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         address vault
     ) external onlyOwner {
         if (vaults.contains(vault)) {
-            revert VaultAlreadyRegistred();
+            revert VaultAlreadyRegistered();
         }
 
         if (!IRegistry(VAULT_REGISTRY).isEntity(vault)) {
@@ -391,7 +391,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ////////////////////////////////////////////////////////////////
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
         if (!operators.contains(operator)) {
-            revert OperatorNotRegistred();
+            revert OperatorNotRegistered();
         }
 
         if (totalStakeCached[epoch]) {
