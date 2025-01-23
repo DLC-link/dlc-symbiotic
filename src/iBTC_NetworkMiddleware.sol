@@ -42,7 +42,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
 
     error OperatorNotOptedIn();
     error OperatorNotRegistered();
-    error OperarorGracePeriodNotPassed();
+    error OperatorGracePeriodNotPassed();
     error OperatorAlreadyRegistered();
 
     error VaultAlreadyRegistered();
@@ -293,7 +293,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         (, uint48 disabledTime) = operators.getTimes(operator);
 
         if (disabledTime == 0 || disabledTime + SLASHING_WINDOW > Time.timestamp()) {
-            revert OperarorGracePeriodNotPassed();
+            revert OperatorGracePeriodNotPassed();
         }
 
         operators.remove(operator);
