@@ -11,7 +11,6 @@ library MapWithTimeData {
     error AlreadyAdded();
     error NotEnabled();
     error AlreadyEnabled();
-    error SetOperationFailed();
 
     uint256 private constant ENABLED_TIME_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFF;
     uint256 private constant DISABLED_TIME_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFF << 48;
@@ -30,10 +29,12 @@ library MapWithTimeData {
         }
 
         value |= uint256(Time.timestamp()) << 48;
-        bool success = self.set(addr, value);
-        if (!success) {
-            revert SetOperationFailed();
-        }
+        self.set(addr, value);
+        //NOTE: it fails with the success check
+        // bool success = self.set(addr, value);
+        // if (!success) {
+        //     revert EnableOperationFailed();
+        // }
     }
 
     function enable(EnumerableMap.AddressToUintMap storage self, address addr) internal {
@@ -43,10 +44,13 @@ library MapWithTimeData {
             revert AlreadyEnabled();
         }
 
-        bool success = self.set(addr, value);
-        if (!success) {
-            revert SetOperationFailed();
-        }
+        value = uint256(Time.timestamp());
+        self.set(addr, value);
+        //NOTE: it fails with the success check
+        // bool success = self.set(addr, value);
+        // if (!success) {
+        //     revert EnableOperationFailed();
+        // }
     }
 
     function atWithTimes(

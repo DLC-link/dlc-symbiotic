@@ -99,15 +99,26 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     ////////////////////////////////////////////////////////////////
     //                          EVENTS                            //
     ////////////////////////////////////////////////////////////////
+    event OperatorRegistered(address indexed operator, bytes32 key, uint256 timestamp);
+    event OperatorKeyUpdated(address indexed operator, bytes32 key, uint256 timestamp);
+    event OperatorPaused(address indexed operator, uint256 timestamp);
+    event OperatorUnpaused(address indexed operator, uint256 timestamp);
+    event OperatorUnregistered(address indexed operator, uint256 timestamp);
+    event VaultRegistered(address indexed vault, uint256 timestamp);
+    event VaultPaused(address indexed vault, uint256 timestamp);
+    event VaultUnpaused(address indexed vault, uint256 timestamp);
+    event VaultUnregistered(address indexed vault, uint256 timestamp);
+    event SubnetworksCntSet(uint256 subnetworksCnt, uint256 timestamp);
+    event RewardTokenSet(address rewardToken, uint256 timestamp);
+    event StakerRewardsSet(address stakerRewards, uint256 timestamp);
+    event OperatorRewardsSet(address operatorRewards, uint256 timestamp);
     event StakerRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 totalStake, uint256 timestamp);
     event OperatorRewardsDistributed(uint48 indexed epoch, uint256 rewardAmount, uint256 timestamp);
-    event RewardTokenSet(address rewardToken);
-    event StakerRewardsSet(address stakerRewards);
-    event OperatorRewardsSet(address operatorRewards);
 
     ////////////////////////////////////////////////////////////////
     //                        MODIFIERS                           //
     ////////////////////////////////////////////////////////////////
+
     modifier updateStakeCache(
         uint48 epoch
     ) {
@@ -250,6 +261,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         updateKey(operator, key);
         operators.add(operator);
         operators.enable(operator);
+        emit OperatorRegistered(operator, key, Time.timestamp());
     }
 
     function updateOperatorKey(address operator, bytes32 key) external onlyOwner {
@@ -258,18 +270,21 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         }
 
         updateKey(operator, key);
+        emit OperatorKeyUpdated(operator, key, Time.timestamp());
     }
 
     function pauseOperator(
         address operator
     ) external onlyOwner {
         operators.disable(operator);
+        emit OperatorPaused(operator, Time.timestamp());
     }
 
     function unpauseOperator(
         address operator
     ) external onlyOwner {
         operators.enable(operator);
+        emit OperatorUnpaused(operator, Time.timestamp());
     }
 
     function unregisterOperator(
@@ -282,6 +297,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         }
 
         operators.remove(operator);
+        emit OperatorUnregistered(operator, Time.timestamp());
     }
 
     function registerVault(
@@ -308,18 +324,21 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
 
         vaults.add(vault);
         vaults.enable(vault);
+        emit VaultRegistered(vault, Time.timestamp());
     }
 
     function pauseVault(
         address vault
     ) external onlyOwner {
         vaults.disable(vault);
+        emit VaultPaused(vault, Time.timestamp());
     }
 
     function unpauseVault(
         address vault
     ) external onlyOwner {
         vaults.enable(vault);
+        emit VaultUnpaused(vault, Time.timestamp());
     }
 
     function unregisterVault(
@@ -332,6 +351,7 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         }
 
         vaults.remove(vault);
+        emit VaultUnregistered(vault, Time.timestamp());
     }
 
     function setSubnetworksCnt(
@@ -342,27 +362,28 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
         }
 
         subnetworksCnt = _subnetworksCnt;
+        emit SubnetworksCntSet(_subnetworksCnt, Time.timestamp());
     }
 
     function setRewardToken(
         address _rewardToken
     ) external onlyOwner {
         REWARD_TOKEN = _rewardToken;
-        emit RewardTokenSet(_rewardToken);
+        emit RewardTokenSet(_rewardToken, Time.timestamp());
     }
 
     function setStakerRewards(
         address _stakerRewards
     ) external onlyOwner {
         STAKER_REWARDS = _stakerRewards;
-        emit StakerRewardsSet(_stakerRewards);
+        emit StakerRewardsSet(_stakerRewards, Time.timestamp());
     }
 
     function setOperatorRewards(
         address _operatorRewards
     ) external onlyOwner {
         OPERATOR_REWARDS = _operatorRewards;
-        emit OperatorRewardsSet(_operatorRewards);
+        emit OperatorRewardsSet(_operatorRewards, Time.timestamp());
     }
 
     ////////////////////////////////////////////////////////////////
@@ -385,10 +406,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             // just skip the vault if it was enabled after the target epoch or not enabled
             if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
                 continue;
-            }
-
-            if (epochStartTs < Time.timestamp()) {
-                revert TooOldEpoch();
             }
 
             for (uint96 j = 0; j < subnetworksCnt; ++j) {
@@ -424,10 +441,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
             // just skip operator if it was added after the target epoch or paused
             if (!_wasActiveAt(enabledTime, disabledTime, epochStartTs)) {
                 continue;
-            }
-
-            if (epochStartTs < Time.timestamp()) {
-                revert TooOldEpoch();
             }
 
             bytes32 key = getOperatorKeyAt(operator, epochStartTs);
