@@ -390,10 +390,6 @@ contract NetworkMiddleware is Initializable, SimpleKeyRegistry32, OwnableUpgrade
     //                     STAKE AND OPS                          //
     ////////////////////////////////////////////////////////////////
     function getOperatorStake(address operator, uint48 epoch) public view returns (uint256 stake) {
-        if (!operators.contains(operator)) {
-            revert OperatorNotRegistered();
-        }
-
         if (totalStakeCached[epoch]) {
             return operatorStakeCache[epoch][operator];
         }
